@@ -205,7 +205,22 @@ export default function StaffManager() {
                 .order('full_name', { ascending: true });
 
             if (error) throw error;
-            setStaff(data || []);
+            if (data) {
+                const seenIds = new Set<string>();
+                const seenEmails = new Set<string>();
+                const dedupedStaff: any[] = [];
+                for (const member of data) {
+                    const emailKey = (member.email || '').trim().toLowerCase();
+                    if (!seenIds.has(member.id) && (!emailKey || !seenEmails.has(emailKey))) {
+                        seenIds.add(member.id);
+                        if (emailKey) seenEmails.add(emailKey);
+                        dedupedStaff.push(member);
+                    }
+                }
+                setStaff(dedupedStaff);
+            } else {
+                setStaff([]);
+            }
         } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to fetch staff members');
         } finally {
@@ -239,11 +254,11 @@ export default function StaffManager() {
 
         Alert.alert(
             '🔒 24-Hour Security Timelock',
-            `Domin tabbatar da tsaro da kariya, canza ${candidateName} zuwa ${promoteRole.toUpperCase()} yana bukatar kidayar lokaci na awanni 24 (24-Hour Countdown) kafin a iya amincewa (approve).\n\nKana son fara kidayar awanni 24 yanzu?`,
+            `To maintain system security, promoting ${candidateName} to ${promoteRole.toUpperCase()} requires a mandatory 24-Hour Security Timelock before final approval.\n\nDo you want to initiate the 24-hour verification countdown now?`,
             [
-                { text: 'A fasa (Cancel)', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Fara Kidayar 24h (Start Timelock)',
+                    text: 'Start 24h Timelock',
                     onPress: async () => {
                         setPromoting(true);
                         try {
@@ -254,15 +269,15 @@ export default function StaffManager() {
                             );
 
                             Alert.alert(
-                                '⏳ Kidayar Awanni 24 Ta Fara!',
-                                res.message || `An fara kidayar awanni 24 (timelock countdown). Da zaran awanni 24 sun cika, maballin 'Approve Promotion' zai kunna a shafin nan.`
+                                '⏳ 24h Timelock Initiated',
+                                res.message || `24-Hour Security Timelock active. Once the countdown completes, the 'Approve Promotion' button will be unlocked.`
                             );
                             setShowAddStaffModal(false);
                             setSelectedUserToPromote(null);
                             fetchPendingPromotions();
                             fetchStaff();
                         } catch (e: any) {
-                            Alert.alert('Kuskure Wajen Fara Timelock', e.message || 'Could not initiate timelock.');
+                            Alert.alert('Timelock Error', e.message || 'Could not initiate timelock.');
                         } finally {
                             setPromoting(false);
                         }
@@ -281,27 +296,27 @@ export default function StaffManager() {
             const m = Math.floor((diff % 3600000) / 60000);
             const secs = Math.floor((diff % 60000) / 1000);
             return Alert.alert(
-                '⏳ Kidayar Lokaci Ba Ta Cika Ba Tukuna!',
-                `Tsarin tsaro na 24-Hour Timelock yana aiki. Ba za a iya amincewa ba har sai kidayar awanni 24 ta cika.\n\nRagowar lokaci: ${h}h ${m}m ${secs}s.`
+                '⏳ Timelock In Progress',
+                `Security Timelock protocol active. Final approval cannot proceed until the 24-hour countdown completes.\n\nRemaining time: ${h}h ${m}m ${secs}s.`
             );
         }
 
         Alert.alert(
-            'Amincewa Da Matsayin Admin 👑',
-            `Awanni 24 sun cika! Kana so ka amince a maida ${candidateName} a matsayin ${item.target_role.toUpperCase()} a yanzu?`,
+            'Approve Admin Promotion 👑',
+            `24-hour verification period complete. Do you want to grant ${item.target_role.toUpperCase()} credentials to ${candidateName} now?`,
             [
-                { text: "A'a (Cancel)", style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Eh, Amince (Approve Now)',
+                    text: 'Approve Now',
                     onPress: async () => {
                         try {
                             setActionLoading(true);
                             const res = await AdminPromotionService.approvePromotion(item.id);
-                            Alert.alert('🎉 An Amince Da Nasara!', res.message || `${candidateName} yanzu ya zama ${item.target_role.toUpperCase()}`);
+                            Alert.alert('🎉 Promotion Approved!', res.message || `${candidateName} has been promoted to ${item.target_role.toUpperCase()}`);
                             fetchStaff();
                             fetchPendingPromotions();
                         } catch (e: any) {
-                            Alert.alert('Kuskure', e.message);
+                            Alert.alert('Error', e.message);
                         } finally {
                             setActionLoading(false);
                         }
@@ -315,21 +330,21 @@ export default function StaffManager() {
         const candidateName = item.target?.full_name || item.target?.email || 'User';
 
         Alert.alert(
-            'Soke Neman Admin 🚫',
-            `Kana da tabbacin kana son soke neman zama ${item.target_role.toUpperCase()} na ${candidateName}?`,
+            'Cancel Promotion Request 🚫',
+            `Are you sure you want to cancel the ${item.target_role.toUpperCase()} promotion request for ${candidateName}?`,
             [
-                { text: 'A bar shi (Keep)', style: 'cancel' },
+                { text: 'Keep Request', style: 'cancel' },
                 {
-                    text: 'Soke Neman (Cancel Request)',
+                    text: 'Cancel Request',
                     style: 'destructive',
                     onPress: async () => {
                         try {
                             setActionLoading(true);
                             await AdminPromotionService.cancelPromotion(item.id, 'Cancelled by Admin');
-                            Alert.alert('Nasara', 'An soke neman zama admin din cikin nasara.');
+                            Alert.alert('Success', 'Promotion request cancelled successfully.');
                             fetchPendingPromotions();
                         } catch (e: any) {
-                            Alert.alert('Kuskure', e.message);
+                            Alert.alert('Error', e.message);
                         } finally {
                             setActionLoading(false);
                         }
@@ -389,12 +404,12 @@ export default function StaffManager() {
         if (newRole === 'user') {
             // Immediate demotion for security safety
             Alert.alert(
-                'Sauke Daga Admin Zuwa User 🛡️',
-                `Kana son sauke ${candidateName} daga admin ya koma USER nan take?`,
+                'Demote from Admin to User 🛡️',
+                `Are you sure you want to demote ${candidateName} to standard user privileges immediately?`,
                 [
-                    { text: 'A fasa (Cancel)', style: 'cancel' },
+                    { text: 'Cancel', style: 'cancel' },
                     {
-                        text: 'Sauke Shi (Revoke Privileges)',
+                        text: 'Revoke Privileges',
                         style: 'destructive',
                         onPress: async () => {
                             try {
@@ -403,7 +418,7 @@ export default function StaffManager() {
                                 setSelectedAdmin((prev: any) => prev ? { ...prev, role: 'user' } : null);
                                 fetchStaff();
                                 fetchPendingPromotions();
-                                Alert.alert('Nasara', 'An sauke matsayin admin din nan take.');
+                                Alert.alert('Success', 'Admin privileges revoked immediately.');
                             } catch (e: any) {
                                 Alert.alert('Error', e.message);
                             } finally {
@@ -419,17 +434,17 @@ export default function StaffManager() {
         // Escalation to super_admin or admin requires 24h timelock
         Alert.alert(
             '🔒 24-Hour Security Timelock',
-            `Sauya ${candidateName} zuwa ${newRole.toUpperCase()} yana bukatar kidayar lokaci na awanni 24 (24-Hour Countdown) kafin a iya amincewa.\n\nKana son fara kidayar awanni 24 yanzu?`,
+            `Promoting ${candidateName} to ${newRole.toUpperCase()} requires a mandatory 24-Hour Security Timelock before final approval.\n\nDo you want to start the 24-hour verification countdown now?`,
             [
-                { text: 'A fasa (Cancel)', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Fara Kidayar 24h (Start Timelock)',
+                    text: 'Start 24h Timelock',
                     onPress: async () => {
                         try {
                             setActionLoading(true);
                             const res = await AdminPromotionService.requestPromotion(admin.id, newRole as 'admin' | 'super_admin');
                             fetchPendingPromotions();
-                            Alert.alert('⏳ Kidayar 24h Ta Fara', res.message || 'Kidayar awanni 24 ta fara. Da zaran ta cika, zaka iya danna Approve.');
+                            Alert.alert('⏳ 24h Timelock Initiated', res.message || '24-hour countdown initiated. Once complete, you can click Approve.');
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
                         } finally {
@@ -656,7 +671,7 @@ export default function StaffManager() {
                                 </View>
                                 <View>
                                     <Text style={s.timelockTitle}>Pending Admin Promotions (24h Timelock)</Text>
-                                    <Text style={s.timelockSub}>Awanni 24 na kidayar lokaci kafin amincewa da matsayin Admin</Text>
+                                    <Text style={s.timelockSub}>24-Hour Security Verification Period Required Before Approval</Text>
                                 </View>
                             </View>
                             <View style={s.timelockCountBadge}>
@@ -720,7 +735,7 @@ export default function StaffManager() {
                                             activeOpacity={0.8}
                                         >
                                             <Ionicons name="close-circle-outline" size={14} color={C.red} />
-                                            <Text style={s.timelockCancelBtnText}>Soke Neman (Cancel)</Text>
+                                            <Text style={s.timelockCancelBtnText}>Cancel Request</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -731,7 +746,7 @@ export default function StaffManager() {
                                         >
                                             <Ionicons name={isReady ? "shield-checkmark" : "lock-closed"} size={14} color={isReady ? "#FFFFFF" : "#94A3B8"} />
                                             <Text style={[s.timelockApproveBtnText, { color: isReady ? "#FFFFFF" : "#94A3B8" }]}>
-                                                {isReady ? "Amince (Approve Promotion 👑)" : `Kulle 🔒 (${h}h ${m}m)`}
+                                                {isReady ? "Approve Promotion 👑" : `Locked 🔒 (${h}h ${m}m)`}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>

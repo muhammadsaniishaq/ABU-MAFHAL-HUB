@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  Switch, 
-  Alert, 
-  ActivityIndicator, 
-  TextInput, 
-  Modal, 
-  StyleSheet, 
-  Dimensions, 
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  StyleSheet,
+  Dimensions,
   Image,
   Platform,
   StatusBar
@@ -177,10 +177,11 @@ export default function SuperAdminMasterHubScreen() {
     lockKYC: false,
   });
 
-  // Staff & Promotion Requests
+  // Staff & Promotion Requests (Strictly Super Admin Exclusive)
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [promotionRequests, setPromotionRequests] = useState<PromotionRequest[]>([]);
   const [approvingReqId, setApprovingReqId] = useState<string | null>(null);
+  const [demotingId, setDemotingId] = useState<string | null>(null);
 
   // Modals
   const [showDrawer, setShowDrawer] = useState(false);
@@ -196,15 +197,10 @@ export default function SuperAdminMasterHubScreen() {
   const [showOperationsModal, setShowOperationsModal] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
 
-  // Create Admin Form in Access Control
-  const [createAdminForm, setCreateAdminForm] = useState({
-    fullName: '',
-    personalEmail: '',
-    usernamePrefix: '',
-    role: 'admin',
-    password: 'Password123!'
-  });
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  // Super Admin Nomination / Search in Access Control
+  const [nominateSearch, setNominateSearch] = useState('');
+  const [nominateResults, setNominateResults] = useState<any[]>([]);
+  const [nominatingUser, setNominatingUser] = useState(false);
 
   useEffect(() => {
     loadMasterDashboardData();
@@ -234,7 +230,7 @@ export default function SuperAdminMasterHubScreen() {
       ]);
 
       const liveUsersCount = uRes.status === 'fulfilled' && typeof uRes.value.count === 'number' ? uRes.value.count : 78459;
-      
+
       let liveTxSum = 0;
       if (tRes.status === 'fulfilled' && tRes.value.data) {
         liveTxSum = tRes.value.data.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
@@ -288,29 +284,56 @@ export default function SuperAdminMasterHubScreen() {
         console.warn('Kill switches load notice:', err);
       }
 
-      // 5. Staff & 24h Promotion Requests
+      // 5. Super Admin Council Only (Strict Deduplication - Zero Double Entries)
       try {
         const { data: staffData } = await supabase
           .from('profiles')
           .select('id, full_name, email, role, status, balance, avatar_url')
-          .in('role', ['admin', 'super_admin'])
-          .order('role', { ascending: false });
+          .eq('role', 'super_admin')
+          .order('full_name', { ascending: true });
 
-        if (staffData) setStaffList(staffData);
+        if (staffData) {
+          const seenIds = new Set<string>();
+          const seenEmails = new Set<string>();
+          const dedupedStaff: StaffMember[] = [];
+
+          for (const member of staffData) {
+            const emailKey = (member.email || '').trim().toLowerCase();
+            if (!seenIds.has(member.id) && (!emailKey || !seenEmails.has(emailKey))) {
+              seenIds.add(member.id);
+              if (emailKey) seenEmails.add(emailKey);
+              dedupedStaff.push({
+                ...member,
+                role: 'super_admin'
+              });
+            }
+          }
+          setStaffList(dedupedStaff);
+        }
 
         const { data: promoData } = await supabase
           .from('admin_promotion_requests')
           .select('*, profiles:target_user_id(full_name, email, phone)')
+          .eq('target_role', 'super_admin')
           .order('created_at', { ascending: false });
 
         if (promoData) {
-          setPromotionRequests(promoData.map((p: any) => ({
-            ...p,
-            target_user: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles || {}
-          })));
+          const seenTargets = new Set<string>();
+          const dedupedPromos: any[] = [];
+
+          for (const p of promoData) {
+            if (!seenTargets.has(p.target_user_id) || p.status !== 'pending') {
+              if (p.status === 'pending') seenTargets.add(p.target_user_id);
+              dedupedPromos.push({
+                ...p,
+                target_user: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles || {}
+              });
+            }
+          }
+          setPromotionRequests(dedupedPromos);
         }
       } catch (pErr) {
-        console.warn('Staff & promotions load notice:', pErr);
+        console.warn('Super Admin council load notice:', pErr);
       }
 
     } catch (e) {
@@ -382,6 +405,109 @@ export default function SuperAdminMasterHubScreen() {
       showUniversalAlert('Rejection Error', err.message || 'Failed to reject promotion');
     } finally {
       setApprovingReqId(null);
+    }
+  };
+
+  const handleDemoteSuperAdmin = async (member: StaffMember) => {
+    const ownerEmails = [
+      'sale.abumafhal@gmail.com',
+      'abumafhal@gmail.com',
+      'admin@abumafhal.com',
+      'muhammadsaniisyaku3@gmail.com'
+    ];
+    if (ownerEmails.includes((member.email || '').toLowerCase().trim())) {
+      return showUniversalAlert('Action Blocked 🔒', 'Primary Root Owner account cannot be removed or demoted.');
+    }
+
+    const performDemote = async () => {
+      setDemotingId(member.id);
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('demote_admin_to_user', {
+          p_user_id: member.id
+        });
+
+        if (!rpcErr && rpcRes?.success) {
+          showUniversalAlert('Access Revoked 🛡️', rpcRes.message || 'User demoted successfully.');
+        } else {
+          await supabase.from('profiles').update({
+            role: 'user',
+            updated_at: new Date().toISOString()
+          }).eq('id', member.id);
+
+          showUniversalAlert('Access Revoked 🛡️', `${member.full_name || member.email} has been demoted to regular user.`);
+        }
+
+        await loadMasterDashboardData();
+      } catch (err: any) {
+        showUniversalAlert('Revocation Error', err.message || 'Failed to demote user');
+      } finally {
+        setDemotingId(null);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(`Are you sure you want to revoke Super Admin clearance from ${member.full_name || member.email}? They will be converted to regular user.`)) {
+        performDemote();
+      }
+    } else {
+      Alert.alert(
+        'Revoke Super Admin Clearance',
+        `Are you sure you want to revoke Super Admin status from ${member.full_name || member.email}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Revoke Clearance', style: 'destructive', onPress: performDemote }
+        ]
+      );
+    }
+  };
+
+  const handleSearchUsersForNomination = async (query: string) => {
+    setNominateSearch(query);
+    if (!query.trim()) {
+      setNominateResults([]);
+      return;
+    }
+    try {
+      const q = query.toLowerCase().trim();
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, role')
+        .neq('role', 'super_admin')
+        .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
+        .limit(8);
+
+      if (data) setNominateResults(data);
+    } catch (err) {
+      console.warn('Nomination search notice:', err);
+    }
+  };
+
+  const handleAppointSuperAdminDirect = async (userToPromote: any) => {
+    setNominatingUser(true);
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('appoint_super_admin_direct', {
+        p_user_id: userToPromote.id,
+        p_notes: 'Direct Super Admin Appointment via Vault Hub'
+      });
+
+      if (!rpcErr && rpcRes?.success) {
+        showUniversalAlert('Appointed Successfully 👑', rpcRes.message || `${userToPromote.full_name || userToPromote.email} is now a Super Admin!`);
+      } else {
+        await supabase.from('profiles').update({
+          role: 'super_admin',
+          updated_at: new Date().toISOString()
+        }).eq('id', userToPromote.id);
+
+        showUniversalAlert('Appointed Successfully 👑', `${userToPromote.full_name || userToPromote.email} is now a Super Admin!`);
+      }
+
+      setNominateSearch('');
+      setNominateResults([]);
+      await loadMasterDashboardData();
+    } catch (err: any) {
+      showUniversalAlert('Appointment Error', err.message || 'Could not appoint Super Admin.');
+    } finally {
+      setNominatingUser(false);
     }
   };
 
@@ -472,10 +598,10 @@ export default function SuperAdminMasterHubScreen() {
 
           {/* Center: Brand Logo & Title */}
           <View style={s.topBrandWrap}>
-            <Image 
-              source={require('../../assets/images/logo.png')} 
-              style={s.topLogoImg} 
-              resizeMode="contain" 
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={s.topLogoImg}
+              resizeMode="contain"
             />
             <View style={s.topDividerLine} />
             <View>
@@ -500,13 +626,13 @@ export default function SuperAdminMasterHubScreen() {
               <View style={s.notifRedDot} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              onPress={() => router.push('/manage/profile')} 
+            <TouchableOpacity
+              onPress={() => router.push('/manage/profile')}
               style={s.avatarCircleBorder}
             >
-              <Image 
-                source={profile?.avatar_url ? { uri: profile.avatar_url } : require('../../assets/images/ceo.jpg')} 
-                style={s.avatarImg} 
+              <Image
+                source={profile?.avatar_url ? { uri: profile.avatar_url } : require('../../assets/images/ceo.jpg')}
+                style={s.avatarImg}
               />
             </TouchableOpacity>
           </View>
@@ -514,8 +640,8 @@ export default function SuperAdminMasterHubScreen() {
       </View>
 
       {/* ─── 2. MAIN SCROLLABLE DASHBOARD ─── */}
-      <ScrollView 
-        style={s.scrollArea} 
+      <ScrollView
+        style={s.scrollArea}
         contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}
       >
@@ -617,8 +743,8 @@ export default function SuperAdminMasterHubScreen() {
             <MaterialCommunityIcons name="layers" size={18} color="#d97706" />
             <Text style={s.sectionMainTitle}>Core Management</Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => setShowDrawer(true)} 
+          <TouchableOpacity
+            onPress={() => setShowDrawer(true)}
             style={s.viewAllPillBtn}
             activeOpacity={0.8}
           >
@@ -674,14 +800,14 @@ export default function SuperAdminMasterHubScreen() {
       {/* ─── 3. BOTTOM NAVIGATION BAR (5 TABS AS IN SCREENSHOT) ─── */}
       <View style={[s.bottomNavBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {/* Tab 1: Dashboard (Active Yellow/Gold Pill) */}
-        <TouchableOpacity 
-          onPress={() => setActiveBottomTab('dashboard')} 
+        <TouchableOpacity
+          onPress={() => setActiveBottomTab('dashboard')}
           style={activeBottomTab === 'dashboard' ? s.bottomNavPillActive : s.bottomNavTab}
         >
-          <Ionicons 
-            name={activeBottomTab === 'dashboard' ? "home" : "home-outline"} 
-            size={18} 
-            color={activeBottomTab === 'dashboard' ? "#071435" : "#64748b"} 
+          <Ionicons
+            name={activeBottomTab === 'dashboard' ? "home" : "home-outline"}
+            size={18}
+            color={activeBottomTab === 'dashboard' ? "#071435" : "#64748b"}
           />
           {activeBottomTab === 'dashboard' && (
             <Text style={s.bottomNavActiveTxt}>Dashboard</Text>
@@ -689,11 +815,11 @@ export default function SuperAdminMasterHubScreen() {
         </TouchableOpacity>
 
         {/* Tab 2: Operations */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             setActiveBottomTab('operations');
             setShowOperationsModal(true);
-          }} 
+          }}
           style={s.bottomNavTab}
         >
           <Ionicons name="layers-outline" size={20} color="#64748b" />
@@ -701,11 +827,11 @@ export default function SuperAdminMasterHubScreen() {
         </TouchableOpacity>
 
         {/* Tab 3: Analytics */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             setActiveBottomTab('analytics');
             router.push('/manage/reports');
-          }} 
+          }}
           style={s.bottomNavTab}
         >
           <Ionicons name="bar-chart-outline" size={20} color="#64748b" />
@@ -713,11 +839,11 @@ export default function SuperAdminMasterHubScreen() {
         </TouchableOpacity>
 
         {/* Tab 4: Controls */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             setActiveBottomTab('controls');
             router.push('/manage/security');
-          }} 
+          }}
           style={s.bottomNavTab}
         >
           <Ionicons name="shield-checkmark-outline" size={20} color="#64748b" />
@@ -725,11 +851,11 @@ export default function SuperAdminMasterHubScreen() {
         </TouchableOpacity>
 
         {/* Tab 5: More */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             setActiveBottomTab('more');
             setShowDrawer(true);
-          }} 
+          }}
           style={s.bottomNavTab}
         >
           <Ionicons name="grid-outline" size={20} color="#64748b" />
@@ -894,111 +1020,276 @@ export default function SuperAdminMasterHubScreen() {
         </View>
       </Modal>
 
-      {/* ─── 7. ACCESS CONTROL & 24H APPROVALS MODAL ─── */}
+      {/* ─── 7. SUPER ADMIN COUNCIL & ACCESS CONTROL MODAL ─── */}
       <Modal visible={showAccessControlModal} transparent animationType="slide" onRequestClose={() => setShowAccessControlModal(false)}>
         <View style={s.modalBackdrop}>
-          <View style={[s.modalBox, { maxHeight: '90%' }]}>
+          <View style={[s.modalBox, { maxHeight: '92%' }]}>
+            {/* Modal Header */}
             <View style={s.modalHeadRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="lock-closed" size={19} color={C.goldBright} />
-                <Text style={s.modalHeadTitle}>Access Control & 24h Approvals</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', alignItems: 'center', justifyContent: 'center' }}>
+                  <MaterialCommunityIcons name="crown" size={20} color={C.goldBright} />
+                </View>
+                <View>
+                  <Text style={s.modalHeadTitle}>Super Admin Council</Text>
+                  <Text style={{ fontSize: 10.5, color: '#64748b', fontWeight: '600' }}>Root Governance • Zero Duplicate Accounts</Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => setShowAccessControlModal(false)}>
+              <TouchableOpacity onPress={() => setShowAccessControlModal(false)} style={{ padding: 4 }}>
                 <Ionicons name="close" size={22} color={C.textMain} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* 24-Hour Promotion Requests Section */}
-              <Text style={{ fontSize: 12, fontWeight: '900', color: C.goldBright, letterSpacing: 0.5, marginBottom: 8 }}>
-                ⏳ 24-HOUR PROMOTION TIMELOCK QUEUE ({pendingApprovalsCount})
-              </Text>
-
-              {promotionRequests.length === 0 ? (
-                <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 16 }}>
-                  <Text style={{ fontSize: 11, color: '#64748b' }}>No pending promotion requests. System timelock is clear.</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Security Metrics Strip */}
+              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
+                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>SUPER ADMINS</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: C.goldBright, marginTop: 2 }}>{staffList.length}</Text>
+                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Active Roster</Text>
                 </View>
-              ) : (
-                promotionRequests.map(req => {
-                  const isPending = req.status === 'pending';
-                  const isApproving = approvingReqId === req.id;
-                  const diff = new Date(req.effective_after).getTime() - Date.now();
-                  const isReady = diff <= 0;
-                  const hours = Math.max(0, Math.floor(diff / (1000 * 60 * 60)));
-                  const mins = Math.max(0, Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)));
+                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>REGULAR ADMINS</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#071435', marginTop: 2 }}>0</Text>
+                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Purged & Cleaned ✓</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>REDUNDANCY</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#10b981', marginTop: 2 }}>ZERO</Text>
+                  <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Deduplicated ✓</Text>
+                </View>
+              </View>
 
-                  return (
-                    <View key={req.id} style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: isPending ? '#f59e0b' : '#e2e8f0' }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#071435' }}>
-                          {req.target_user?.full_name || 'Nominated Member'}
-                        </Text>
-                        <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#d97706' }}>
-                            TO: {req.target_role.toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{req.target_user?.email}</Text>
-                      
-                      <View style={{ marginTop: 6, padding: 6, borderRadius: 6, backgroundColor: isReady ? '#ecfdf5' : '#fffbeb', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons name={isReady ? "checkmark-circle" : "time"} size={14} color={isReady ? "#10b981" : "#d97706"} />
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: isReady ? "#047857" : "#b45309" }}>
-                          {isPending ? (isReady ? 'READY FOR FINAL APPROVAL 👑' : `${hours}h ${mins}m COUNTDOWN REMAINING ⏳`) : req.status.toUpperCase()}
-                        </Text>
-                      </View>
-
-                      {isPending && (
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                          <TouchableOpacity
-                            onPress={() => handleApprovePromotion(req)}
-                            disabled={isApproving}
-                            style={{ flex: 1, backgroundColor: '#071435', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-                          >
-                            {isApproving ? <ActivityIndicator size="small" color="#f5a623" /> : <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800' }}>Approve 👑</Text>}
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleRejectPromotion(req)}
-                            disabled={isApproving}
-                            style={{ backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-                          >
-                            <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>Reject 🚫</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })
-              )}
-
-              {/* Staff Roster Overview */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
-                <Text style={{ fontSize: 12, fontWeight: '900', color: '#071435', letterSpacing: 0.5 }}>
-                  ACTIVE STAFF ROSTER ({staffList.length})
-                </Text>
+              {/* Active Super Admin Council Members */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons name="shield-crown" size={16} color={C.goldBright} />
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#071435', letterSpacing: 0.5 }}>
+                    VERIFIED SUPER ADMINS ({staffList.length})
+                  </Text>
+                </View>
                 <TouchableOpacity 
                   onPress={() => {
                     setShowAccessControlModal(false);
                     router.push('/manage/staff');
                   }}
                 >
-                  <Text style={{ color: C.goldBright, fontSize: 11, fontWeight: '800' }}>Full Directory ➡️</Text>
+                  <Text style={{ color: C.goldBright, fontSize: 11, fontWeight: '800' }}>Staff Directory ➡️</Text>
                 </TouchableOpacity>
               </View>
 
-              {staffList.slice(0, 5).map(member => (
-                <View key={member.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#071435' }}>{member.full_name}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748b' }}>{member.email}</Text>
-                  </View>
-                  <View style={{ backgroundColor: member.role === 'super_admin' ? '#fffbeb' : '#eff6ff', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: member.role === 'super_admin' ? '#d97706' : '#2563eb' }}>
-                      {member.role === 'super_admin' ? 'SUPER ADMIN' : 'ADMIN'}
-                    </Text>
-                  </View>
+              {staffList.length === 0 ? (
+                <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>No Super Admin records found.</Text>
                 </View>
-              ))}
+              ) : (
+                staffList.map(member => {
+                  const emailLower = (member.email || '').toLowerCase().trim();
+                  const isRootOwner = [
+                    'sale.abumafhal@gmail.com',
+                    'abumafhal@gmail.com',
+                    'admin@abumafhal.com',
+                    'muhammadsaniisyaku3@gmail.com'
+                  ].includes(emailLower);
+                  const isDemoting = demotingId === member.id;
+
+                  return (
+                    <View 
+                      key={member.id} 
+                      style={{ 
+                        backgroundColor: '#ffffff', 
+                        borderRadius: 14, 
+                        padding: 12, 
+                        marginBottom: 10, 
+                        borderWidth: 1, 
+                        borderColor: '#e8edf5',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 3,
+                        elevation: 1
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        {/* Member Avatar */}
+                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#fffbeb', borderWidth: 1.5, borderColor: C.goldBright, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          {member.avatar_url ? (
+                            <Image source={{ uri: member.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                          ) : (
+                            <Text style={{ fontSize: 14, fontWeight: '900', color: C.goldBright }}>
+                              {member.full_name ? member.full_name.substring(0, 2).toUpperCase() : 'SA'}
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Name and Info */}
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#071435' }} numberOfLines={1}>
+                              {member.full_name || 'Super Admin Member'}
+                            </Text>
+                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#047857' }}>ONLINE</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginTop: 1 }} numberOfLines={1}>{member.email}</Text>
+                        </View>
+
+                        {/* Role Badge */}
+                        <View style={{ backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MaterialCommunityIcons name="crown" size={12} color={C.goldBright} />
+                          <Text style={{ fontSize: 10, fontWeight: '900', color: '#b45309' }}>SUPER ADMIN</Text>
+                        </View>
+                      </View>
+
+                      {/* Action Bar */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                        <Text style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: '600' }}>
+                          Balance: ₦{(Number(member.balance) || 0).toLocaleString()}
+                        </Text>
+
+                        {isRootOwner ? (
+                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="key" size={11} color="#d97706" />
+                            <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#92400e' }}>PRIMARY ROOT OWNER</Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleDemoteSuperAdmin(member)}
+                            disabled={isDemoting}
+                            style={{ backgroundColor: '#fee2e2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          >
+                            {isDemoting ? (
+                              <ActivityIndicator size="small" color="#ef4444" />
+                            ) : (
+                              <>
+                                <Ionicons name="arrow-down-circle" size={12} color="#dc2626" />
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#dc2626' }}>Demote to User</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+
+              {/* Appoint / Nominate Super Admin Section */}
+              <View style={{ marginTop: 16, backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons name="person-add" size={16} color={C.goldBright} />
+                  <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#071435' }}>Appoint New Super Admin</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+                  Search any registered user to appoint to the Super Admin Council with zero duplicate records.
+                </Text>
+
+                {/* User Search Input */}
+                <View style={[s.searchInputWrap, { marginHorizontal: 0, marginBottom: 8 }]}>
+                  <Ionicons name="search-outline" size={15} color="#64748b" style={{ marginRight: 6 }} />
+                  <TextInput
+                    placeholder="Search user by name, email, or phone..."
+                    value={nominateSearch}
+                    onChangeText={handleSearchUsersForNomination}
+                    placeholderTextColor="#94a3b8"
+                    style={{ flex: 1, paddingVertical: 6, color: '#071435', fontSize: 12.5, fontWeight: '600' }}
+                  />
+                  {nominateSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => handleSearchUsersForNomination('')}>
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Search Results */}
+                {nominateResults.length > 0 && (
+                  <View style={{ backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', padding: 6, marginBottom: 8 }}>
+                    {nominateResults.map(usr => (
+                      <View key={usr.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#071435' }}>{usr.full_name || 'Member'}</Text>
+                          <Text style={{ fontSize: 10.5, color: '#64748b' }}>{usr.email}</Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleAppointSuperAdminDirect(usr)}
+                          disabled={nominatingUser}
+                          style={{ backgroundColor: '#071435', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        >
+                          {nominatingUser ? (
+                            <ActivityIndicator size="small" color="#f5a623" />
+                          ) : (
+                            <>
+                              <MaterialCommunityIcons name="crown" size={12} color="#f5a623" />
+                              <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900' }}>Appoint 👑</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* 24-Hour Promotion Requests Section (If Any) */}
+              {promotionRequests.length > 0 && (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: C.goldBright, letterSpacing: 0.5, marginBottom: 8 }}>
+                    ⏳ 24-HOUR PROMOTION TIMELOCK QUEUE ({pendingApprovalsCount})
+                  </Text>
+
+                  {promotionRequests.map(req => {
+                    const isPending = req.status === 'pending';
+                    const isApproving = approvingReqId === req.id;
+                    const diff = new Date(req.effective_after).getTime() - Date.now();
+                    const isReady = diff <= 0;
+                    const hours = Math.max(0, Math.floor(diff / (1000 * 60 * 60)));
+                    const mins = Math.max(0, Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)));
+
+                    return (
+                      <View key={req.id} style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: isPending ? '#f59e0b' : '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#071435' }}>
+                            {req.target_user?.full_name || 'Nominated Member'}
+                          </Text>
+                          <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#d97706' }}>
+                              TO: {req.target_role.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{req.target_user?.email}</Text>
+                        
+                        <View style={{ marginTop: 6, padding: 6, borderRadius: 6, backgroundColor: isReady ? '#ecfdf5' : '#fffbeb', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name={isReady ? "checkmark-circle" : "time"} size={14} color={isReady ? "#10b981" : "#d97706"} />
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: isReady ? "#047857" : "#b45309" }}>
+                            {isPending ? (isReady ? 'READY FOR FINAL APPROVAL 👑' : `${hours}h ${mins}m COUNTDOWN REMAINING ⏳`) : req.status.toUpperCase()}
+                          </Text>
+                        </View>
+
+                        {isPending && (
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => handleApprovePromotion(req)}
+                              disabled={isApproving}
+                              style={{ flex: 1, backgroundColor: '#071435', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                            >
+                              {isApproving ? <ActivityIndicator size="small" color="#f5a623" /> : <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800' }}>Approve 👑</Text>}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleRejectPromotion(req)}
+                              disabled={isApproving}
+                              style={{ backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                            >
+                              <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>Reject 🚫</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
