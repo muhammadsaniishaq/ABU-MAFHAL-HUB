@@ -34,66 +34,16 @@ EXECUTE FUNCTION public.prevent_unauthorized_profile_updates();
 
 
 -- ==============================================================================
--- 2. ONE-TIME CLEANUP WITH BYPASS ENABLED
+-- 2. DEDUPLICATE PENDING REQUESTS SAFELY
 -- ==============================================================================
-DO $$
-DECLARE
-    v_owner_emails TEXT[] := ARRAY[
-        'sale.abumafhal@gmail.com', 
-        'abumafhal@gmail.com', 
-        'admin@abumafhal.com', 
-        'muhammadsaniisyaku3@gmail.com'
-    ];
-BEGIN
-    -- Enable bypass flag for this session
-    PERFORM set_config('app.bypass_profile_lock', 'true', true);
-
-    -- 1. Ensure all primary owner accounts are strictly set to 'super_admin'
-    UPDATE public.profiles
-    SET role = 'super_admin',
-        updated_at = timezone('utc'::text, now())
-    WHERE lower(email) = ANY(v_owner_emails);
-
-    UPDATE auth.users
-    SET raw_app_meta_data = jsonb_set(
-        COALESCE(raw_app_meta_data, '{}'::jsonb),
-        '{role}',
-        '"super_admin"'::jsonb
-    )
-    WHERE lower(email) = ANY(v_owner_emails);
-
-    -- 2. Demote any user currently having role = 'admin' (non-super-admin) back to 'user'
-    -- This cleans up regular admins so ONLY true 'super_admin' roles remain.
-    UPDATE public.profiles
-    SET role = 'user',
-        updated_at = timezone('utc'::text, now())
-    WHERE role = 'admin' 
-      AND lower(email) != ALL(v_owner_emails);
-
-    UPDATE auth.users
-    SET raw_app_meta_data = jsonb_set(
-        COALESCE(raw_app_meta_data, '{}'::jsonb),
-        '{role}',
-        '"user"'::jsonb
-    )
-    WHERE (raw_app_meta_data->>'role') = 'admin'
-      AND lower(email) != ALL(v_owner_emails);
-
-    -- 3. Eliminate duplicate / redundant pending promotion requests
-    -- If multiple pending requests exist for the same target_user_id, keep only the latest one
-    WITH ranked_requests AS (
-        SELECT id, 
-               target_user_id,
-               ROW_NUMBER() OVER (PARTITION BY target_user_id ORDER BY created_at DESC) as rn
+DELETE FROM public.admin_promotion_requests
+WHERE id IN (
+    SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY target_user_id ORDER BY created_at DESC) as rn
         FROM public.admin_promotion_requests
         WHERE status = 'pending'
-    )
-    DELETE FROM public.admin_promotion_requests
-    WHERE id IN (
-        SELECT id FROM ranked_requests WHERE rn > 1
-    );
-
-END $$;
+    ) sub WHERE sub.rn > 1
+);
 
 
 -- ==============================================================================

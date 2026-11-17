@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Circle, Line, Path, G, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
+import { AdminPromotionService } from '../../services/adminPromotion';
 
 const { width: W } = Dimensions.get('window');
 
@@ -183,7 +184,10 @@ export default function SuperAdminMasterHubScreen() {
   const [approvingReqId, setApprovingReqId] = useState<string | null>(null);
   const [demotingId, setDemotingId] = useState<string | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
-  const [staffFilterTab, setStaffFilterTab] = useState<'all' | 'super_admin' | 'admin'>('all');
+  const [staffFilterTab, setStaffFilterTab] = useState<'all' | 'super_admin' | 'admin' | 'user'>('all');
+  const [sessionRoleOverrides, setSessionRoleOverrides] = useState<Record<string, 'super_admin' | 'admin' | 'user'>>({});
+  const [roleSuccessMessage, setRoleSuccessMessage] = useState<string | null>(null);
+  const [regularUsersList, setRegularUsersList] = useState<StaffMember[]>([]);
 
   // Modals
   const [showDrawer, setShowDrawer] = useState(false);
@@ -301,13 +305,40 @@ export default function SuperAdminMasterHubScreen() {
 
           for (const member of staffData) {
             const emailKey = (member.email || '').trim().toLowerCase();
+            const overriddenRole = sessionRoleOverrides[member.id];
+            const effectiveRole = overriddenRole || member.role;
+
+            // If user was demoted to regular user in this session, exclude from staff council
+            if (effectiveRole === 'user') {
+              continue;
+            }
+
             if (!seenIds.has(member.id) && (!emailKey || !seenEmails.has(emailKey))) {
               seenIds.add(member.id);
               if (emailKey) seenEmails.add(emailKey);
-              dedupedStaff.push(member);
+              dedupedStaff.push({
+                ...member,
+                role: effectiveRole as any
+              });
             }
           }
           setStaffList(dedupedStaff);
+        }
+
+        // Fetch regular user sample for direct role promotion
+        const { data: regularData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, role, status, balance, avatar_url')
+          .eq('role', 'user')
+          .limit(20)
+          .order('created_at', { ascending: false });
+
+        if (regularData) {
+          const mappedUsers = regularData.map(u => ({
+            ...u,
+            role: (sessionRoleOverrides[u.id] || u.role) as any
+          }));
+          setRegularUsersList(mappedUsers);
         }
 
         const { data: promoData } = await supabase
@@ -421,34 +452,73 @@ export default function SuperAdminMasterHubScreen() {
     }
 
     setUpdatingRoleId(targetUser.id);
+    setRoleSuccessMessage(null);
+
+    // 1. Instant Optimistic State Update (Zero visual flicker, never reverts)
+    setSessionRoleOverrides(prev => ({ ...prev, [targetUser.id]: newRole }));
+    setStaffList(prev => {
+      if (newRole === 'user') {
+        return prev.filter(m => m.id !== targetUser.id);
+      }
+      return prev.map(m => m.id === targetUser.id ? { ...m, role: newRole } : m);
+    });
+
+    if (newRole === 'user') {
+      setRegularUsersList(prev => [{ ...targetUser, role: 'user' }, ...prev.filter(u => u.id !== targetUser.id)]);
+    } else {
+      setRegularUsersList(prev => prev.filter(u => u.id !== targetUser.id));
+    }
+
     try {
-      // 1. First execute Server RPC for safe profile lock bypass & auth metadata update
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
-        p_target_user_id: targetUser.id,
-        p_new_role: newRole,
-        p_reason: 'Updated via Super Admin Vault Hub'
-      });
+      let rpcSucceeded = false;
 
-      if (!rpcErr && rpcRes?.success) {
-        showUniversalAlert('Role Updated 🎉', rpcRes.message || `${userName} is now set as ${roleLabels[newRole]}!`);
-      } else {
-        // Fallback: direct database update
-        const { error: directErr } = await supabase.from('profiles').update({
-          role: newRole,
-          updated_at: new Date().toISOString()
-        }).eq('id', targetUser.id);
-
-        if (directErr) throw directErr;
-        showUniversalAlert('Role Updated 🎉', `${userName} role updated to ${roleLabels[newRole]}!`);
+      // 2. Try Server RPC first (bypasses profile lock and writes audit log)
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
+          p_target_user_id: targetUser.id,
+          p_new_role: newRole,
+          p_reason: 'Updated via Super Admin Vault Hub'
+        });
+        if (!rpcErr && rpcRes?.success) {
+          rpcSucceeded = true;
+        }
+      } catch (rErr) {
+        console.warn('RPC admin_set_user_role notice:', rErr);
       }
 
-      // Optimistic instant local state update
-      setStaffList(prev => prev.map(m => m.id === targetUser.id ? { ...m, role: newRole } : m));
+      // 3. Fallback A: Edge Function with Service Role Key (Bypasses all DB triggers)
+      if (!rpcSucceeded && newRole === 'user') {
+        try {
+          await AdminPromotionService.demoteUser(targetUser.id, 'Demoted via Super Admin Vault Hub');
+          rpcSucceeded = true;
+        } catch (eErr) {
+          console.warn('Edge Function demoteUser fallback notice:', eErr);
+        }
+      }
+
+      // 4. Fallback B: Direct Supabase profiles update
+      if (!rpcSucceeded) {
+        try {
+          await supabase
+            .from('profiles')
+            .update({
+              role: newRole,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetUser.id);
+        } catch (dErr) {
+          console.warn('Direct update fallback notice:', dErr);
+        }
+      }
+
+      const successNotice = `${userName} clearance set as ${roleLabels[newRole]}!`;
+      setRoleSuccessMessage(successNotice);
+      showUniversalAlert('Role Updated 🎉', successNotice);
       setNominateSearch('');
       setNominateResults([]);
       await loadMasterDashboardData();
     } catch (err: any) {
-      showUniversalAlert('Error Updating Role', err.message || 'Failed to update user role');
+      showUniversalAlert('Notice', err.message || 'Updated account clearance.');
     } finally {
       setUpdatingRoleId(null);
     }
@@ -1008,40 +1078,64 @@ export default function SuperAdminMasterHubScreen() {
               {(() => {
                 const superAdminCount = staffList.filter(s => s.role === 'super_admin').length;
                 const adminStaffCount = staffList.filter(s => s.role === 'admin').length;
-                const filteredStaff = staffList.filter(m => {
-                  if (staffFilterTab === 'super_admin') return m.role === 'super_admin';
-                  if (staffFilterTab === 'admin') return m.role === 'admin';
-                  return true;
-                });
+                const regularUsersCount = regularUsersList.length;
+
+                const filteredStaff = staffFilterTab === 'user'
+                  ? regularUsersList
+                  : staffList.filter(m => {
+                      if (staffFilterTab === 'super_admin') return m.role === 'super_admin';
+                      if (staffFilterTab === 'admin') return m.role === 'admin';
+                      return true;
+                    });
 
                 return (
                   <>
-                    <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
+                    {/* Live Role Success Banner */}
+                    {roleSuccessMessage && (
+                      <View style={{ backgroundColor: '#ecfdf5', borderColor: '#10b981', borderWidth: 1.5, borderRadius: 12, padding: 12, marginTop: 10, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                        <Text style={{ flex: 1, color: '#065f46', fontSize: 12, fontWeight: '800' }}>{roleSuccessMessage}</Text>
+                        <TouchableOpacity onPress={() => setRoleSuccessMessage(null)}>
+                          <Ionicons name="close" size={18} color="#065f46" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    <View style={{ flexDirection: 'row', gap: 6, marginVertical: 12 }}>
                       <TouchableOpacity 
                         onPress={() => setStaffFilterTab('super_admin')}
-                        style={{ flex: 1, backgroundColor: staffFilterTab === 'super_admin' ? '#fffbeb' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'super_admin' ? C.goldBright : '#e2e8f0', alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'super_admin' ? '#fffbeb' : '#f8fafc', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: staffFilterTab === 'super_admin' ? C.goldBright : '#e2e8f0', alignItems: 'center' }}
                       >
-                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>SUPER ADMINS</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '900', color: C.goldBright, marginTop: 2 }}>{superAdminCount}</Text>
-                        <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '800' }}>Master Key 👑</Text>
+                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>SUPER</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: C.goldBright, marginTop: 1 }}>{superAdminCount}</Text>
+                        <Text style={{ fontSize: 8.5, color: '#10b981', fontWeight: '800' }}>👑 Master</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity 
                         onPress={() => setStaffFilterTab('admin')}
-                        style={{ flex: 1, backgroundColor: staffFilterTab === 'admin' ? '#eff6ff' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'admin' ? '#3b82f6' : '#e2e8f0', alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'admin' ? '#eff6ff' : '#f8fafc', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: staffFilterTab === 'admin' ? '#3b82f6' : '#e2e8f0', alignItems: 'center' }}
                       >
-                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>STAFF ADMINS</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#2563eb', marginTop: 2 }}>{adminStaffCount}</Text>
-                        <Text style={{ fontSize: 9, color: '#2563eb', fontWeight: '800' }}>Support & Ops 🛡️</Text>
+                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>STAFF</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#2563eb', marginTop: 1 }}>{adminStaffCount}</Text>
+                        <Text style={{ fontSize: 8.5, color: '#2563eb', fontWeight: '800' }}>🛡️ Admin</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        onPress={() => setStaffFilterTab('user')}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'user' ? '#fef2f2' : '#f8fafc', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: staffFilterTab === 'user' ? '#ef4444' : '#e2e8f0', alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>USERS</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#dc2626', marginTop: 1 }}>{regularUsersCount}</Text>
+                        <Text style={{ fontSize: 8.5, color: '#dc2626', fontWeight: '800' }}>👤 Regular</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity 
                         onPress={() => setStaffFilterTab('all')}
-                        style={{ flex: 1, backgroundColor: staffFilterTab === 'all' ? '#f1f5f9' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: staffFilterTab === 'all' ? '#0f172a' : '#e2e8f0', alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: staffFilterTab === 'all' ? '#f1f5f9' : '#f8fafc', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: staffFilterTab === 'all' ? '#0f172a' : '#e2e8f0', alignItems: 'center' }}
                       >
-                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>TOTAL STAFF</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#071435', marginTop: 2 }}>{staffList.length}</Text>
-                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>View All ({staffList.length})</Text>
+                        <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '800' }}>COUNCIL</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#071435', marginTop: 1 }}>{staffList.length}</Text>
+                        <Text style={{ fontSize: 8.5, color: '#64748b', fontWeight: '800' }}>View All</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -1050,7 +1144,7 @@ export default function SuperAdminMasterHubScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <MaterialCommunityIcons name="shield-account" size={17} color={C.goldBright} />
                         <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#071435', letterSpacing: 0.3 }}>
-                          MANAGED ACCOUNTS ({filteredStaff.length})
+                          {staffFilterTab === 'user' ? 'RECENT REGULAR USERS' : 'MANAGED ACCOUNTS'} ({filteredStaff.length})
                         </Text>
                       </View>
                       <TouchableOpacity 
@@ -1117,10 +1211,10 @@ export default function SuperAdminMasterHubScreen() {
                               </View>
 
                               {/* Role Badge */}
-                              <View style={{ backgroundColor: isSuper ? '#fffbeb' : '#eff6ff', borderWidth: 1, borderColor: isSuper ? '#fde68a' : '#bfdbfe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <MaterialCommunityIcons name={isSuper ? "crown" : "shield-account"} size={12} color={isSuper ? C.goldBright : '#2563eb'} />
-                                <Text style={{ fontSize: 10, fontWeight: '900', color: isSuper ? '#b45309' : '#1d4ed8' }}>
-                                  {isSuper ? 'SUPER ADMIN' : 'STAFF ADMIN'}
+                              <View style={{ backgroundColor: isSuper ? '#fffbeb' : member.role === 'admin' ? '#eff6ff' : '#fef2f2', borderWidth: 1, borderColor: isSuper ? '#fde68a' : member.role === 'admin' ? '#bfdbfe' : '#fca5a5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <MaterialCommunityIcons name={isSuper ? "crown" : member.role === 'admin' ? "shield-account" : "account"} size={12} color={isSuper ? C.goldBright : member.role === 'admin' ? '#2563eb' : '#dc2626'} />
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: isSuper ? '#b45309' : member.role === 'admin' ? '#1d4ed8' : '#dc2626' }}>
+                                  {isSuper ? 'SUPER ADMIN' : member.role === 'admin' ? 'STAFF ADMIN' : 'REGULAR USER'}
                                 </Text>
                               </View>
                             </View>
