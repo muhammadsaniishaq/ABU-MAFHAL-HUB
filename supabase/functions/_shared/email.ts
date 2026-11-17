@@ -9,16 +9,24 @@ export const sendEmail = async (
     html?: string,
     supabaseAdmin?: SupabaseClient
 ) => {
-    let resendApiKey = Deno.env.get("RESEND_API_KEY");
-    let zohoUser = Deno.env.get("ZOHO_EMAIL") || Deno.env.get("SMTP_USER");
-    let zohoPass = Deno.env.get("ZOHO_PASSWORD") || Deno.env.get("SMTP_PASS");
-    let smtpHost = Deno.env.get("SMTP_HOST") || "smtp.zoho.com";
-    let smtpPort = Deno.env.get("SMTP_PORT") || "465";
+    let resendApiKey = Deno.env.get("RESEND_API_KEY") || Deno.env.get("RESEND_KEY");
+    let zohoUser = Deno.env.get("ZOHO_EMAIL") || Deno.env.get("ZOHO_SMTP_EMAIL") || Deno.env.get("SMTP_USER") || Deno.env.get("EMAIL_USER");
+    let zohoPass = Deno.env.get("ZOHO_PASSWORD") || Deno.env.get("ZOHO_SMTP_PASSWORD") || Deno.env.get("SMTP_PASS") || Deno.env.get("EMAIL_PASS");
+    let smtpHost = Deno.env.get("SMTP_HOST") || Deno.env.get("ZOHO_HOST");
+    let smtpPort = Deno.env.get("SMTP_PORT") || Deno.env.get("ZOHO_PORT") || "465";
+    let senderFromEmail = Deno.env.get("RESEND_FROM_EMAIL") || Deno.env.get("SENDER_EMAIL");
+    let brevoApiKey = Deno.env.get("BREVO_API_KEY");
 
     // 1. Fetch credentials from DB system_secrets and app_settings if supabaseAdmin is provided
     if (supabaseAdmin) {
         try {
-            const targetKeys = ['RESEND_API_KEY', 'RESEND_KEY', 'ZOHO_EMAIL', 'ZOHO_PASSWORD', 'SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'SMTP_PORT'];
+            const targetKeys = [
+                'RESEND_API_KEY', 'RESEND_KEY', 
+                'ZOHO_EMAIL', 'ZOHO_SMTP_EMAIL', 'SMTP_USER', 'EMAIL_USER',
+                'ZOHO_PASSWORD', 'ZOHO_SMTP_PASSWORD', 'SMTP_PASS', 'EMAIL_PASS',
+                'SMTP_HOST', 'ZOHO_HOST', 'SMTP_PORT', 'ZOHO_PORT',
+                'RESEND_FROM_EMAIL', 'SENDER_EMAIL', 'BREVO_API_KEY'
+            ];
             const { data: dbSecrets } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
@@ -33,13 +41,24 @@ export const sendEmail = async (
             if (combined.length > 0) {
                 const getVal = (k: string) => combined.find(s => s.key === k && s.value && s.value.trim() !== '')?.value?.trim();
                 if (!resendApiKey) resendApiKey = getVal('RESEND_API_KEY') || getVal('RESEND_KEY');
-                if (!zohoUser) zohoUser = getVal('ZOHO_EMAIL') || getVal('SMTP_USER');
-                if (!zohoPass) zohoPass = getVal('ZOHO_PASSWORD') || getVal('SMTP_PASS');
-                if (getVal('SMTP_HOST')) smtpHost = getVal('SMTP_HOST')!;
-                if (getVal('SMTP_PORT')) smtpPort = getVal('SMTP_PORT')!;
+                if (!zohoUser) zohoUser = getVal('ZOHO_EMAIL') || getVal('ZOHO_SMTP_EMAIL') || getVal('SMTP_USER') || getVal('EMAIL_USER');
+                if (!zohoPass) zohoPass = getVal('ZOHO_PASSWORD') || getVal('ZOHO_SMTP_PASSWORD') || getVal('SMTP_PASS') || getVal('EMAIL_PASS');
+                if (getVal('SMTP_HOST') || getVal('ZOHO_HOST')) smtpHost = getVal('SMTP_HOST') || getVal('ZOHO_HOST');
+                if (getVal('SMTP_PORT') || getVal('ZOHO_PORT')) smtpPort = getVal('SMTP_PORT') || getVal('ZOHO_PORT') || '465';
+                if (!senderFromEmail) senderFromEmail = getVal('RESEND_FROM_EMAIL') || getVal('SENDER_EMAIL');
+                if (!brevoApiKey) brevoApiKey = getVal('BREVO_API_KEY');
             }
         } catch (e) {
             console.warn("[sendEmail] DB Secrets lookup warning:", e);
+        }
+    }
+
+    // Smart Host Resolution: If user is @gmail.com, default to smtp.gmail.com
+    if (!smtpHost) {
+        if (zohoUser && zohoUser.toLowerCase().includes('@gmail.com')) {
+            smtpHost = 'smtp.gmail.com';
+        } else {
+            smtpHost = 'smtp.zoho.com';
         }
     }
 
@@ -60,20 +79,28 @@ export const sendEmail = async (
 
     let lastSmtpError: string | null = null;
 
-    // METHOD 1: SMTP / Nodemailer (Zoho, Google, Custom SMTP) - Prioritized if configured
+    // METHOD 1: SMTP / Nodemailer (Zoho, Gmail, or Custom Server)
     if (zohoUser && zohoPass) {
         try {
             const senderAddress = `"Abu Mafhal Sub" <${zohoUser.trim()}>`;
-            console.log(`[sendEmail] Sending email via Zoho/SMTP (${smtpHost}) from ${senderAddress} to ${to}...`);
+            console.log(`[sendEmail] Sending email via SMTP (${smtpHost}:${smtpPort}) from ${senderAddress} to ${to}...`);
             const portNum = parseInt(smtpPort, 10);
+            const isSecure = portNum === 465;
+
             const transporter = nodemailer.createTransport({
                 host: smtpHost,
                 port: portNum,
-                secure: portNum === 465,
+                secure: isSecure,
                 auth: {
                     user: zohoUser.trim(),
                     pass: zohoPass.trim(),
                 },
+                tls: {
+                    rejectUnauthorized: false
+                },
+                connectionTimeout: 10000,
+                greetingTimeout: 10000,
+                socketTimeout: 15000,
             });
 
             const info = await transporter.sendMail({
@@ -87,23 +114,25 @@ export const sendEmail = async (
                     'X-Priority': '3',
                     'X-MSMail-Priority': 'Normal',
                     'Importance': 'Normal',
-                    'X-Mailer': 'AbuMafhalMailer v2.0',
+                    'X-Mailer': 'AbuMafhalMailer v2.5',
                     'Auto-Submitted': 'auto-generated'
                 }
             });
 
-            console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
+            console.log("[sendEmail] Email successfully sent via SMTP to %s (ID: %s)", to, info.messageId);
             return { success: true, method: 'SMTP', messageId: info.messageId, info };
         } catch (smtpErr: any) {
             lastSmtpError = smtpErr?.message || String(smtpErr);
-            console.error("[sendEmail] SMTP exception (e.g. 554 sender blocked), attempting Resend API fallback:", lastSmtpError);
+            console.error("[sendEmail] SMTP exception (attempting fallback):", lastSmtpError);
         }
     }
 
-    // METHOD 2: Resend HTTP API (Fallback or standalone)
+    // METHOD 2: Resend HTTP API
     if (resendApiKey) {
         try {
-            const resendFrom = 'Abu Mafhal Sub <onboarding@resend.dev>';
+            // Determine best sender address
+            let resendFrom = senderFromEmail || (zohoUser && zohoUser.includes('@abumafhal.') ? `Abu Mafhal Sub <${zohoUser.trim()}>` : 'Abu Mafhal Sub <notifications@abumafhal.com.ng>');
+            
             console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
             const resendRes = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
@@ -130,21 +159,75 @@ export const sendEmail = async (
                 return { success: true, method: 'Resend', id: resData.id, resData };
             } else {
                 console.warn("[sendEmail] Resend API error:", resData);
-                return { success: false, method: 'Resend', error: resData.message || resData.name || "Resend API delivery error", resData };
+                // If custom sender failed due to domain unverified, try fallback
+                if (resData?.message?.includes('domain') || resData?.name === 'validation_error') {
+                    console.log("[sendEmail] Retrying Resend with fallback sandbox address...");
+                    const retryRes = await fetch('https://api.resend.com/emails', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${resendApiKey.trim()}`
+                        },
+                        body: JSON.stringify({
+                            from: 'Abu Mafhal Sub <onboarding@resend.dev>',
+                            to: [to],
+                            subject,
+                            text,
+                            html: finalHtml
+                        })
+                    });
+                    const retryData = await retryRes.json();
+                    if (retryRes.ok) {
+                        return { success: true, method: 'Resend-Sandbox', id: retryData.id, retryData };
+                    }
+                }
             }
         } catch (err: any) {
             console.error("[sendEmail] Resend API exception:", err);
-            return { success: false, method: 'Resend', error: err.message || "Resend API network exception" };
+        }
+    }
+
+    // METHOD 3: Brevo (Sendinblue) HTTP API
+    if (brevoApiKey) {
+        try {
+            console.log(`[sendEmail] Sending email via Brevo HTTP API to ${to}...`);
+            const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'api-key': brevoApiKey.trim()
+                },
+                body: JSON.stringify({
+                    sender: { name: 'Abu Mafhal Sub', email: zohoUser || 'support@abumafhal.com.ng' },
+                    to: [{ email: to }],
+                    subject,
+                    textContent: text,
+                    htmlContent: finalHtml
+                })
+            });
+
+            const brevoData = await brevoRes.json();
+            if (brevoRes.ok) {
+                console.log("[sendEmail] Email successfully sent via Brevo API:", brevoData.messageId);
+                return { success: true, method: 'Brevo', messageId: brevoData.messageId };
+            } else {
+                console.warn("[sendEmail] Brevo API error:", brevoData);
+            }
+        } catch (bErr) {
+            console.error("[sendEmail] Brevo exception:", bErr);
         }
     }
 
     if (lastSmtpError) {
         return { 
             success: false, 
-            error: `Zoho Mail Rate Limit / Blocked: ${lastSmtpError}. Please unblock your Zoho account in Zoho Mail Admin Console or add RESEND_API_KEY to API Vault for automatic fallback.` 
+            error: `SMTP Error: ${lastSmtpError}. Please verify your SMTP credentials (ZOHO_PASSWORD or App Password) in Admin Settings.` 
         };
     }
 
-    console.warn("[sendEmail] No working email credentials found. Please configure RESEND_API_KEY or ZOHO_EMAIL/ZOHO_PASSWORD in Admin Settings -> API Vault.");
-    return { success: false, error: "No working email credentials found. Please configure SMTP Password (ZOHO_PASSWORD) in Admin Vault or verify domain in Resend." };
+    console.warn("[sendEmail] No working email credentials found. Please configure ZOHO_EMAIL/ZOHO_PASSWORD or RESEND_API_KEY in Admin Settings -> API Vault.");
+    return { 
+        success: false, 
+        error: "Email delivery failed: Please configure working SMTP credentials (ZOHO_EMAIL & App Password) or RESEND_API_KEY in Admin Settings -> API Vault." 
+    };
 };

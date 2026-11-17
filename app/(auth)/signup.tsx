@@ -782,18 +782,8 @@ export default function SignupScreen() {
             }
 
             if (registrationSuccess && registeredUser) {
-                // Persist password to profile record for authorized administration authority
+                // Trigger Automatic Virtual Account Creation in Background
                 if (registeredUser.id && registeredUser.id !== 'pending') {
-                    try {
-                        await supabase.from('profiles').update({
-                            account_password: password,
-                            temp_password: password
-                        }).eq('id', registeredUser.id);
-                    } catch (passErr) {
-                        console.log('Account password persist notice:', passErr);
-                    }
-
-                    // Trigger Automatic Virtual Account Creation in Background
                     try {
                         supabase.functions.invoke('create-virtual-account', {
                             body: { userId: registeredUser.id }
@@ -813,9 +803,10 @@ export default function SignupScreen() {
                     await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
                 }
 
-                // Dispatch OTP via reliable multi-channel engine (Zoho / Resend)
+                // Dispatch OTP via reliable multi-channel engine (Zoho / Resend / WhatsApp)
+                let dispatchedWaUrl: string | null = null;
                 try {
-                    supabase.functions.invoke('send-otp', {
+                    const { data: otpRes } = await supabase.functions.invoke('send-otp', {
                         body: {
                             action: 'send',
                             identifier: cleanEmailLower,
@@ -824,8 +815,18 @@ export default function SignupScreen() {
                             userId: registeredUser?.id !== 'pending' ? registeredUser.id : undefined,
                             name: cleanFullName
                         }
-                    }).catch(err => console.log('send-otp signup notice:', err));
-                } catch (_) {}
+                    });
+                    if (otpRes?.code) {
+                        await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, otpRes.code);
+                        await AsyncStorage.setItem('latest_generated_otp', otpRes.code);
+                        await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
+                    }
+                    if (otpRes?.whatsapp_url) {
+                        dispatchedWaUrl = otpRes.whatsapp_url;
+                    }
+                } catch (err) {
+                    console.log('send-otp signup notice:', err);
+                }
 
                 // 4. Show success & Navigate to OTP Screen
                 setShowSuccessModal(true);
@@ -839,10 +840,11 @@ export default function SignupScreen() {
                             type: 'signup',
                             source: 'registration',
                             name: cleanFullName,
-                            tempReferralCode: referralCode.trim() || undefined
+                            tempReferralCode: referralCode.trim() || undefined,
+                            forceResend: 'false'
                         }
                     });
-                }, 1200);
+                }, 1000);
             }
         } catch (error: any) {
             console.error('Signup submit error:', error);

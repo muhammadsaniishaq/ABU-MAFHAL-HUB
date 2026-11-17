@@ -100,16 +100,20 @@ export default function OTP() {
     const checkAndSendOtpEmail = async (emailToSend: string) => {
         if (params.type === '2fa') return;
         const isFromSignup = params.type === 'signup' || params.mode === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
-        // If coming directly from Signup or Unconfirmed Login, Supabase Auth ALREADY dispatched the code!
-        // Do NOT send a duplicate email!
+        
+        // If coming directly from Signup, verify if a fresh OTP code was already generated in signup
         if (isFromSignup && params.forceResend !== 'true') {
-            setCounter(60);
-            return;
-        }
-
-        if (params.forceResend === 'true') {
-            await sendOtpEmail(emailToSend, true);
-            return;
+            try {
+                const clean = emailToSend.toLowerCase().trim();
+                const existingCode = await AsyncStorage.getItem(`recovery_otp_${clean}`) || await AsyncStorage.getItem('latest_generated_otp');
+                const existingTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${clean}`) || await AsyncStorage.getItem('latest_generated_otp_time');
+                const isFresh = existingTimeStr ? (Date.now() - parseInt(existingTimeStr, 10) < 60000) : false;
+                
+                if (existingCode && isFresh) {
+                    setCounter(60);
+                    return;
+                }
+            } catch (_) {}
         }
 
         await sendOtpEmail(emailToSend, true);
@@ -133,9 +137,9 @@ export default function OTP() {
                     console.log('Supabase signup resend note:', resendErr);
                 }
 
-                // 2. Multi-channel send-otp edge function dispatch via Zoho SMTP / Resend
+                // 2. Multi-channel send-otp edge function dispatch via Zoho SMTP / Resend / Brevo
                 try {
-                    await supabase.functions.invoke('send-otp', {
+                    const { data: edgeRes } = await supabase.functions.invoke('send-otp', {
                         body: {
                             action: 'send',
                             identifier: cleanEmailLower,
@@ -143,6 +147,17 @@ export default function OTP() {
                             purpose: 'signup',
                         }
                     });
+                    if (edgeRes?.code) {
+                        await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, edgeRes.code);
+                        await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, edgeRes.code);
+                        await AsyncStorage.setItem('latest_generated_otp', edgeRes.code);
+                        await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
+                        await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
+                        await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
+                    }
+                    if (edgeRes?.whatsapp_url) {
+                        setWhatsappUrl(edgeRes.whatsapp_url);
+                    }
                 } catch (edgeOtpErr) {
                     console.log('send-otp edge dispatch note:', edgeOtpErr);
                 }
