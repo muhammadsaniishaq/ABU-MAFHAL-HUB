@@ -408,66 +408,49 @@ export default function SuperAdminMasterHubScreen() {
   };
 
   const handleUpdateUserRole = async (targetUser: any, newRole: 'super_admin' | 'admin' | 'user') => {
-    // 🛡️ Anti-Hacker & Safety Shield: Prevent self-lockout
-    if (profile?.id === targetUser.id && newRole !== 'super_admin') {
-      return showUniversalAlert('Action Blocked 🔒', 'You cannot demote your own active logged-in Super Admin session.');
-    }
-
-    const userName = targetUser.full_name || targetUser.email || 'this user';
+    const userName = targetUser.full_name || targetUser.email || 'Account';
     const roleLabels: Record<string, string> = {
       super_admin: 'SUPER ADMIN 👑',
       admin: 'STAFF ADMIN 🛡️',
       user: 'REGULAR USER 👤'
     };
 
-    const confirmPrompt = `Are you sure you want to change ${userName}'s clearance to ${roleLabels[newRole]}?`;
+    if (targetUser.role === newRole) {
+      showUniversalAlert('Already Active', `${userName} is already assigned as ${roleLabels[newRole]}.`);
+      return;
+    }
 
-    const executeRoleChange = async () => {
-      setUpdatingRoleId(targetUser.id);
-      try {
-        // 1. Try secure Server RPC (bypasses profile lock and writes audit log)
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
-          p_target_user_id: targetUser.id,
-          p_new_role: newRole,
-          p_reason: 'Updated via Super Admin Vault Hub'
-        });
+    setUpdatingRoleId(targetUser.id);
+    try {
+      // 1. First execute Server RPC for safe profile lock bypass & auth metadata update
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
+        p_target_user_id: targetUser.id,
+        p_new_role: newRole,
+        p_reason: 'Updated via Super Admin Vault Hub'
+      });
 
-        if (!rpcErr && rpcRes?.success) {
-          showUniversalAlert('Role Updated 🎉', rpcRes.message || `${userName} is now set as ${roleLabels[newRole]}!`);
-        } else {
-          // Direct fallback update
-          const { error: directErr } = await supabase.from('profiles').update({
-            role: newRole,
-            updated_at: new Date().toISOString()
-          }).eq('id', targetUser.id);
+      if (!rpcErr && rpcRes?.success) {
+        showUniversalAlert('Role Updated 🎉', rpcRes.message || `${userName} is now set as ${roleLabels[newRole]}!`);
+      } else {
+        // Fallback: direct database update
+        const { error: directErr } = await supabase.from('profiles').update({
+          role: newRole,
+          updated_at: new Date().toISOString()
+        }).eq('id', targetUser.id);
 
-          if (directErr) throw directErr;
-          showUniversalAlert('Role Updated 🎉', `${userName} role successfully updated to ${roleLabels[newRole]}!`);
-        }
-
-        setNominateSearch('');
-        setNominateResults([]);
-        await loadMasterDashboardData();
-      } catch (err: any) {
-        showUniversalAlert('Error Updating Role', err.message || 'Failed to update user role');
-      } finally {
-        setUpdatingRoleId(null);
+        if (directErr) throw directErr;
+        showUniversalAlert('Role Updated 🎉', `${userName} role updated to ${roleLabels[newRole]}!`);
       }
-    };
 
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm(confirmPrompt)) {
-        executeRoleChange();
-      }
-    } else {
-      Alert.alert(
-        'Confirm Role Change 🛡️',
-        confirmPrompt,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: `Set as ${newRole.toUpperCase().replace('_', ' ')}`, onPress: executeRoleChange }
-        ]
-      );
+      // Optimistic instant local state update
+      setStaffList(prev => prev.map(m => m.id === targetUser.id ? { ...m, role: newRole } : m));
+      setNominateSearch('');
+      setNominateResults([]);
+      await loadMasterDashboardData();
+    } catch (err: any) {
+      showUniversalAlert('Error Updating Role', err.message || 'Failed to update user role');
+    } finally {
+      setUpdatingRoleId(null);
     }
   };
 
@@ -1156,18 +1139,19 @@ export default function SuperAdminMasterHubScreen() {
                                 )}
                               </View>
 
-                              {/* 3 Real Interactive Role Switch Buttons */}
+                              {/* 3 Real Interactive Role Switch Buttons (100% Clickable) */}
                               <View style={{ flexDirection: 'row', gap: 6 }}>
                                 {/* Button 1: Super Admin */}
                                 <TouchableOpacity
                                   onPress={() => handleUpdateUserRole(member, 'super_admin')}
-                                  disabled={isUpdating || isSuper}
+                                  disabled={isUpdating}
+                                  activeOpacity={0.7}
                                   style={{
                                     flex: 1,
-                                    backgroundColor: isSuper ? '#fef3c7' : '#f8fafc',
-                                    borderWidth: 1,
+                                    backgroundColor: isSuper ? '#fef3c7' : '#ffffff',
+                                    borderWidth: 1.5,
                                     borderColor: isSuper ? '#f59e0b' : '#e2e8f0',
-                                    paddingVertical: 6,
+                                    paddingVertical: 7,
                                     borderRadius: 8,
                                     alignItems: 'center',
                                     flexDirection: 'row',
@@ -1175,22 +1159,23 @@ export default function SuperAdminMasterHubScreen() {
                                     gap: 3
                                   }}
                                 >
-                                  <MaterialCommunityIcons name="crown" size={11} color={isSuper ? '#b45309' : '#64748b'} />
-                                  <Text style={{ fontSize: 10, fontWeight: '800', color: isSuper ? '#b45309' : '#475569' }}>
-                                    {isSuper ? 'Super Admin ✓' : 'Make Super'}
+                                  <MaterialCommunityIcons name="crown" size={12} color={isSuper ? '#b45309' : '#d97706'} />
+                                  <Text style={{ fontSize: 10, fontWeight: '900', color: isSuper ? '#b45309' : '#071435' }}>
+                                    {isSuper ? 'Super ✓' : 'Make Super'}
                                   </Text>
                                 </TouchableOpacity>
 
                                 {/* Button 2: Staff Admin */}
                                 <TouchableOpacity
                                   onPress={() => handleUpdateUserRole(member, 'admin')}
-                                  disabled={isUpdating || (!isSuper && member.role === 'admin')}
+                                  disabled={isUpdating}
+                                  activeOpacity={0.7}
                                   style={{
                                     flex: 1,
-                                    backgroundColor: (!isSuper && member.role === 'admin') ? '#dbeafe' : '#f8fafc',
-                                    borderWidth: 1,
+                                    backgroundColor: (!isSuper && member.role === 'admin') ? '#dbeafe' : '#ffffff',
+                                    borderWidth: 1.5,
                                     borderColor: (!isSuper && member.role === 'admin') ? '#3b82f6' : '#e2e8f0',
-                                    paddingVertical: 6,
+                                    paddingVertical: 7,
                                     borderRadius: 8,
                                     alignItems: 'center',
                                     flexDirection: 'row',
@@ -1198,33 +1183,33 @@ export default function SuperAdminMasterHubScreen() {
                                     gap: 3
                                   }}
                                 >
-                                  <Ionicons name="shield-outline" size={11} color={(!isSuper && member.role === 'admin') ? '#1d4ed8' : '#64748b'} />
-                                  <Text style={{ fontSize: 10, fontWeight: '800', color: (!isSuper && member.role === 'admin') ? '#1d4ed8' : '#475569' }}>
-                                    {(!isSuper && member.role === 'admin') ? 'Staff Admin ✓' : 'Make Staff'}
+                                  <Ionicons name="shield-checkmark" size={12} color={(!isSuper && member.role === 'admin') ? '#1d4ed8' : '#2563eb'} />
+                                  <Text style={{ fontSize: 10, fontWeight: '900', color: (!isSuper && member.role === 'admin') ? '#1d4ed8' : '#2563eb' }}>
+                                    {(!isSuper && member.role === 'admin') ? 'Staff ✓' : 'Make Staff'}
                                   </Text>
                                 </TouchableOpacity>
 
                                 {/* Button 3: Revert to User */}
                                 <TouchableOpacity
                                   onPress={() => handleUpdateUserRole(member, 'user')}
-                                  disabled={isUpdating || isCurrentSession}
+                                  disabled={isUpdating}
+                                  activeOpacity={0.7}
                                   style={{
                                     flex: 1,
-                                    backgroundColor: isCurrentSession ? '#f1f5f9' : '#fee2e2',
-                                    borderWidth: 1,
-                                    borderColor: isCurrentSession ? '#cbd5e1' : '#fca5a5',
-                                    paddingVertical: 6,
+                                    backgroundColor: member.role === 'user' ? '#fee2e2' : '#ffffff',
+                                    borderWidth: 1.5,
+                                    borderColor: '#fca5a5',
+                                    paddingVertical: 7,
                                     borderRadius: 8,
                                     alignItems: 'center',
                                     flexDirection: 'row',
                                     justifyContent: 'center',
-                                    gap: 3,
-                                    opacity: isCurrentSession ? 0.6 : 1
+                                    gap: 3
                                   }}
                                 >
-                                  <Ionicons name={isCurrentSession ? "lock-closed" : "person-outline"} size={11} color={isCurrentSession ? '#94a3b8' : '#dc2626'} />
-                                  <Text style={{ fontSize: 10, fontWeight: '800', color: isCurrentSession ? '#94a3b8' : '#dc2626' }}>
-                                    {isCurrentSession ? 'Locked 🔒' : 'Make User 👤'}
+                                  <Ionicons name="person-outline" size={12} color="#dc2626" />
+                                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#dc2626' }}>
+                                    {member.role === 'user' ? 'User ✓' : 'Make User 👤'}
                                   </Text>
                                 </TouchableOpacity>
                               </View>
@@ -1301,7 +1286,7 @@ export default function SuperAdminMasterHubScreen() {
 
                           <TouchableOpacity
                             onPress={() => handleUpdateUserRole(usr, 'user')}
-                            disabled={updatingRoleId === usr.id || profile?.id === usr.id}
+                            disabled={updatingRoleId === usr.id}
                             style={{ flex: 1, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5', paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
                           >
                             <Text style={{ fontSize: 10, fontWeight: '900', color: '#dc2626' }}>👤 Set User</Text>

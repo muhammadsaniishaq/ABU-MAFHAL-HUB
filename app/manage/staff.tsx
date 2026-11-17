@@ -401,59 +401,27 @@ export default function StaffManager() {
 
         const candidateName = admin.full_name || admin.email || 'this admin';
 
-        if (newRole === 'user') {
-            // Immediate demotion for security safety
-            Alert.alert(
-                'Demote from Admin to User 🛡️',
-                `Are you sure you want to demote ${candidateName} to standard user privileges immediately?`,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Revoke Privileges',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                setActionLoading(true);
-                                await AdminPromotionService.demoteUser(admin.id, 'Demoted by Super Admin');
-                                setSelectedAdmin((prev: any) => prev ? { ...prev, role: 'user' } : null);
-                                fetchStaff();
-                                fetchPendingPromotions();
-                                Alert.alert('Success', 'Admin privileges revoked immediately.');
-                            } catch (e: any) {
-                                Alert.alert('Error', e.message);
-                            } finally {
-                                setActionLoading(false);
-                            }
-                        }
-                    }
-                ]
-            );
-            return;
-        }
+        try {
+            setActionLoading(true);
+            const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
+                p_target_user_id: admin.id,
+                p_new_role: newRole,
+                p_reason: 'Updated via Staff Manager'
+            });
 
-        // Escalation to super_admin or admin requires 24h timelock
-        Alert.alert(
-            '🔒 24-Hour Security Timelock',
-            `Promoting ${candidateName} to ${newRole.toUpperCase()} requires a mandatory 24-Hour Security Timelock before final approval.\n\nDo you want to start the 24-hour verification countdown now?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Start 24h Timelock',
-                    onPress: async () => {
-                        try {
-                            setActionLoading(true);
-                            const res = await AdminPromotionService.requestPromotion(admin.id, newRole as 'admin' | 'super_admin');
-                            fetchPendingPromotions();
-                            Alert.alert('⏳ 24h Timelock Initiated', res.message || '24-hour countdown initiated. Once complete, you can click Approve.');
-                        } catch (e: any) {
-                            Alert.alert('Error', e.message);
-                        } finally {
-                            setActionLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
+            if (rpcErr) {
+                await supabase.from('profiles').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', admin.id);
+            }
+
+            setSelectedAdmin((prev: any) => prev ? { ...prev, role: newRole } : null);
+            fetchStaff();
+            fetchPendingPromotions();
+            Alert.alert('Role Updated 🎉', `${candidateName} is now set as ${newRole.toUpperCase()}`);
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const openAdminProfile = async (admin: any) => {

@@ -1735,23 +1735,16 @@ export default function UserManagement() {
         };
 
         try {
-            // Check if promoting to Admin (24h timelock protocol requirement)
-            let isPromotionRequested = false;
-            if (selectedUser.role === 'user' && (editForm.role === 'admin' || editForm.role === 'super_admin')) {
+            // 0. Update role directly if changed
+            if (editForm.role && editForm.role !== selectedUser.role) {
                 try {
-                    const { data: authData } = await supabase.auth.getUser();
-                    const { error: promoErr } = await supabase.from('admin_promotion_requests').insert({
-                        target_user_id: selectedUser.id,
-                        target_role: editForm.role,
-                        requested_by: authData.user?.id,
-                        requested_by_email: authData.user?.email,
-                        notes: 'Requested via Admin User Management edit form'
+                    await supabase.rpc('admin_set_user_role', {
+                        p_target_user_id: selectedUser.id,
+                        p_new_role: editForm.role,
+                        p_reason: 'Updated via User Profile Edit form'
                     });
-                    if (!promoErr) {
-                        isPromotionRequested = true;
-                    }
                 } catch (pErr) {
-                    console.warn("Promotion request notice:", pErr);
+                    console.warn("Direct role RPC notice:", pErr);
                 }
             }
 
@@ -1776,13 +1769,9 @@ export default function UserManagement() {
                 status: editForm.status || 'active',
                 transfer_limit: parseFloat(editForm.transfer_limit) || 500000,
                 admin_notes: safeTrim(editForm.admin_notes),
+                role: editForm.role || selectedUser.role || 'user',
                 updated_at: new Date().toISOString()
             };
-
-            // Keep user role unless approved via timelock or demoting
-            if (editForm.role === selectedUser.role || editForm.role === 'user') {
-                coreProfilePayload.role = editForm.role;
-            }
 
             // Extended Profile Payload (optional profile columns)
             const extendedProfilePayload: Record<string, any> = {
@@ -1857,9 +1846,6 @@ export default function UserManagement() {
                 account_number: trimmedAcc || selectedUser.account_number,
                 bank_name: trimmedBank
             };
-            if (isPromotionRequested) {
-                mergedUser.role = selectedUser.role; // keep user role until 24h timelock
-            }
 
             // Retain lastLoadedUserIdRef so useEffect won't reset the editForm
             lastLoadedUserIdRef.current = selectedUser.id;
@@ -1867,9 +1853,7 @@ export default function UserManagement() {
             setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...mergedUser } : u));
 
             // 5. Success Notifications (In-form Banner + Universal Web & Mobile Alert)
-            const successNotice = isPromotionRequested
-                ? "Profile updated! Admin promotion request has been queued in the 24-hour timelock approval queue."
-                : "User profile, permissions, bank details, and limits updated successfully!";
+            const successNotice = "User profile, role permissions, bank details, and limits updated successfully!";
 
             setSaveBanner({
                 type: 'success',
@@ -2038,22 +2022,21 @@ export default function UserManagement() {
             }
             else if (pendingAction.type === 'promote') {
                 const targetRole = pendingAction.role || (selectedUser.role === 'super_admin' ? 'admin' : selectedUser.role === 'admin' ? 'user' : 'admin');
-                if (targetRole === 'user') {
-                    await AdminPromotionService.demoteUser(selectedUser.id, 'Demoted via User Management');
-                    Alert.alert("Privileges Revoked 🛡️", "User has been reverted to regular USER role.");
-                    setSelectedUser({ ...selectedUser, role: 'user' });
+                try {
+                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_set_user_role', {
+                        p_target_user_id: selectedUser.id,
+                        p_new_role: targetRole,
+                        p_reason: 'Updated via User Management quick action'
+                    });
+                    if (rpcErr) {
+                        await supabase.from('profiles').update({ role: targetRole, updated_at: new Date().toISOString() }).eq('id', selectedUser.id);
+                    }
+                    Alert.alert("Role Updated 🎉", `User clearance is now ${targetRole.toUpperCase()}`);
+                    setSelectedUser({ ...selectedUser, role: targetRole });
+                    setEditForm((prev: any) => ({ ...prev, role: targetRole }));
                     fetchUsers();
-                } else {
-                    const res = await AdminPromotionService.requestPromotion(
-                        selectedUser.id,
-                        targetRole as 'admin' | 'super_admin',
-                        `Initiated via User Management`
-                    );
-                    Alert.alert(
-                        "⏳ 24-Hour Timelock Started",
-                        res.message || `An fara kidayar awanni 24. Da zaran kidayar ta cika, za a iya amincewa (approve) a sashen Staff & Roles.`
-                    );
-                    fetchUsers();
+                } catch (e: any) {
+                    Alert.alert("Update Error", e.message || "Failed to update user role");
                 }
             }
             else if (pendingAction.type === 'toggle_crypto') {
