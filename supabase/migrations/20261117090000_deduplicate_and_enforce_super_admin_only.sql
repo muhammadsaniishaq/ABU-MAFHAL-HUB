@@ -1,6 +1,41 @@
 -- Migration: 20261117090000_deduplicate_and_enforce_super_admin_only.sql
--- Description: Purge regular admin roles, enforce strict Super Admin exclusive governance, and eliminate double entries.
+-- Description: Fix prevent_unauthorized_profile_updates trigger, purge regular admin roles, enforce strict Super Admin exclusive governance, and eliminate double entries.
 
+-- ==============================================================================
+-- 1. FIX TRIGGER FUNCTION: REMOVE NON-EXISTENT COLUMNS (account_password, etc.)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.prevent_unauthorized_profile_updates()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Allow service_role, explicit internal bypass, or authorized admins
+    IF current_setting('app.bypass_profile_lock', true) = 'true'
+       OR (current_setting('request.jwt.claims', true)::jsonb->>'role' = 'service_role')
+       OR public.is_admin() THEN
+        RETURN NEW;
+    END IF;
+
+    -- Anti-Hacker Shield for non-admins: Lock down only columns that actually exist on profiles
+    NEW.balance := OLD.balance;
+    NEW.role := OLD.role;
+    NEW.kyc_tier := OLD.kyc_tier;
+    NEW.kyc_verified := OLD.kyc_verified;
+    NEW.status := OLD.status;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Re-attach trigger safely
+DROP TRIGGER IF EXISTS tr_prevent_unauthorized_profile_updates ON public.profiles;
+CREATE TRIGGER tr_prevent_unauthorized_profile_updates
+BEFORE UPDATE ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_unauthorized_profile_updates();
+
+
+-- ==============================================================================
+-- 2. ONE-TIME CLEANUP WITH BYPASS ENABLED
+-- ==============================================================================
 DO $$
 DECLARE
     v_owner_emails TEXT[] := ARRAY[
@@ -10,6 +45,9 @@ DECLARE
         'muhammadsaniisyaku3@gmail.com'
     ];
 BEGIN
+    -- Enable bypass flag for this session
+    PERFORM set_config('app.bypass_profile_lock', 'true', true);
+
     -- 1. Ensure all primary owner accounts are strictly set to 'super_admin'
     UPDATE public.profiles
     SET role = 'super_admin',
@@ -57,7 +95,10 @@ BEGIN
 
 END $$;
 
--- 4. SECURE RPC TO DEMOTE ANY ADMIN/USER TO REGULAR USER
+
+-- ==============================================================================
+-- 3. SECURE RPC TO DEMOTE ANY ADMIN/USER TO REGULAR USER
+-- ==============================================================================
 CREATE OR REPLACE FUNCTION public.demote_admin_to_user(p_user_id UUID)
 RETURNS JSONB AS $$
 DECLARE
@@ -145,7 +186,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5. SECURE RPC TO APPOINT SUPER ADMIN DIRECTLY (WITH DEDUPLICATION)
+
+-- ==============================================================================
+-- 4. SECURE RPC TO APPOINT SUPER ADMIN DIRECTLY (WITH DEDUPLICATION)
+-- ==============================================================================
 CREATE OR REPLACE FUNCTION public.appoint_super_admin_direct(p_user_id UUID, p_notes TEXT DEFAULT 'Appointed by Super Admin')
 RETURNS JSONB AS $$
 DECLARE
