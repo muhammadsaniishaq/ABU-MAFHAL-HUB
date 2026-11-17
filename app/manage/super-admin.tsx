@@ -1068,7 +1068,7 @@ export default function SuperAdminMasterHubScreen() {
                     VERIFIED SUPER ADMINS ({staffList.length})
                   </Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => {
                     setShowAccessControlModal(false);
                     router.push('/manage/staff');
@@ -1094,14 +1094,14 @@ export default function SuperAdminMasterHubScreen() {
                   const isDemoting = demotingId === member.id;
 
                   return (
-                    <View 
-                      key={member.id} 
-                      style={{ 
-                        backgroundColor: '#ffffff', 
-                        borderRadius: 14, 
-                        padding: 12, 
-                        marginBottom: 10, 
-                        borderWidth: 1, 
+                    <View
+                      key={member.id}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 10,
+                        borderWidth: 1,
                         borderColor: '#e8edf5',
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 1 },
@@ -1259,7 +1259,7 @@ export default function SuperAdminMasterHubScreen() {
                           </View>
                         </View>
                         <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{req.target_user?.email}</Text>
-                        
+
                         <View style={{ marginTop: 6, padding: 6, borderRadius: 6, backgroundColor: isReady ? '#ecfdf5' : '#fffbeb', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name={isReady ? "checkmark-circle" : "time"} size={14} color={isReady ? "#10b981" : "#d97706"} />
                           <Text style={{ fontSize: 10, fontWeight: '800', color: isReady ? "#047857" : "#b45309" }}>
