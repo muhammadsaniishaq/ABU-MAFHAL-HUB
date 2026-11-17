@@ -155,6 +155,7 @@ export default function AdminLayout() {
             }}
         >
             <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="super-admin" options={{ headerShown: false }} />
             <Stack.Screen name="api" options={{ title: 'API Vault & Master Control' }} />
             <Stack.Screen name="secrets" options={{ title: 'System Secrets' }} />
             <Stack.Screen name="users" options={{ title: 'User Management' }} />
