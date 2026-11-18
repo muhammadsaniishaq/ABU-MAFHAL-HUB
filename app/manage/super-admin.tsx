@@ -624,10 +624,21 @@ export default function SuperAdminMasterHubScreen() {
       {/* ─── 1. TOP HEADER (EXACT SCREENSHOT LAYOUT) ─── */}
       <View style={[s.topHeader, { paddingTop: Math.max(insets.top, 10) }]}>
         <View style={s.topHeaderContent}>
-          {/* Left: Hamburger Icon */}
-          <TouchableOpacity onPress={() => setShowDrawer(true)} style={s.topIconBtn}>
-            <Ionicons name="menu" size={24} color={C.textMain} />
-          </TouchableOpacity>
+          {/* Left: Back to Admin Dashboard + Hamburger Icon */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity 
+              onPress={() => router.replace('/manage')} 
+              style={s.topDashboardReturnBtn}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-back" size={15} color={C.textMain} />
+              <Text style={s.topDashboardReturnText}>Admin</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setShowDrawer(true)} style={s.topIconBtn}>
+              <Ionicons name="menu" size={22} color={C.textMain} />
+            </TouchableOpacity>
+          </View>
 
           {/* Center: Brand Logo & Title */}
           <View style={s.topBrandWrap}>
@@ -1643,6 +1654,22 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
+  },
+  topDashboardReturnBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  topDashboardReturnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   topIconBtn: {
     width: 38,
