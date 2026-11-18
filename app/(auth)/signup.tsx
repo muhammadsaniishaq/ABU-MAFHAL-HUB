@@ -690,162 +690,71 @@ export default function SignupScreen() {
                 console.log('Pre-signup DB check notice:', preCheckError);
             }
 
-            // 🛡️ PRIMARY REGISTRATION ENGINE: High-Availability Edge Function (Zero Confirmation Email Errors)
-            let registeredUser: any = null;
-            let registrationSuccess = false;
+            // 🛡️ SECURE REGISTRATION FLOW (OTP-First Architecture):
+            // Account is ONLY created in the database AFTER the user successfully enters and verifies OTP!
+            // This prevents abandoned, fake, or unverified users from cluttering the Users database.
+            const cleanEmailLower = cleanEmail.toLowerCase().trim();
 
+            // 1. Save pending registration data in local storage
+            await AsyncStorage.setItem('pending_auth_email', cleanEmailLower);
+            await AsyncStorage.setItem('pending_auth_pass', password);
+            await AsyncStorage.setItem('pending_reg_full_name', cleanFullName);
+            await AsyncStorage.setItem('pending_reg_username', cleanUsername);
+            await AsyncStorage.setItem('pending_reg_phone', cleanPhone);
+            await AsyncStorage.setItem('pending_reg_country', selectedCountry.name);
+            await AsyncStorage.setItem('just_signed_up', 'true');
+            await AsyncStorage.setItem('signup_timestamp', String(Date.now()));
+            if (referralCode && referralCode.trim()) {
+                await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
+            }
+
+            // 2. Dispatch 6-digit OTP code directly to user's email via high-speed Resend / Multi-channel engine
+            let dispatchedWaUrl: string | null = null;
             try {
-                const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('auth-signup', {
+                const { data: otpRes, error: otpErr } = await supabase.functions.invoke('send-otp', {
                     body: {
-                        email: cleanEmail,
-                        password: password,
-                        full_name: cleanFullName,
-                        username: cleanUsername,
+                        action: 'send',
+                        identifier: cleanEmailLower,
+                        channel: 'email',
+                        purpose: 'signup',
+                        name: cleanFullName
+                    }
+                });
+
+                if (otpRes?.code) {
+                    await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, otpRes.code);
+                    await AsyncStorage.setItem('latest_generated_otp', otpRes.code);
+                    await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
+                }
+                if (otpRes?.whatsapp_url) {
+                    dispatchedWaUrl = otpRes.whatsapp_url;
+                }
+            } catch (err) {
+                console.log('send-otp dispatch notice in signup:', err);
+            }
+
+            // 3. Show success confirmation modal & navigate to OTP verification screen
+            setShowSuccessModal(true);
+            setTimeout(() => {
+                setShowSuccessModal(false);
+                router.replace({
+                    pathname: '/otp' as any,
+                    params: { 
+                        email: cleanEmailLower,
                         phone: cleanPhone,
-                        referral_code: referralCode.trim() || null,
-                        country: selectedCountry.name
+                        type: 'signup',
+                        mode: 'signup',
+                        source: 'registration',
+                        name: cleanFullName,
+                        tempFullName: cleanFullName,
+                        tempUsername: cleanUsername,
+                        tempPhone: cleanPhone,
+                        tempEmail: cleanEmailLower,
+                        tempReferralCode: referralCode.trim() || undefined,
+                        forceResend: 'false'
                     }
                 });
-
-                if (!edgeErr && edgeData?.success && edgeData?.user) {
-                    registeredUser = edgeData.user;
-                    registrationSuccess = true;
-                } else if (edgeData?.error) {
-                    const errMsg = String(edgeData.error);
-                    if (errMsg.toLowerCase().includes('already registered') || 
-                        errMsg.toLowerCase().includes('already exists') || 
-                        errMsg.toLowerCase().includes('already taken') || 
-                        errMsg.toLowerCase().includes('duplicate')) {
-                        notifyUser('Account Notice 🔒', errMsg);
-                        setLoading(false);
-                        return;
-                    }
-                    console.log('auth-signup function returned notice:', errMsg);
-                }
-            } catch (edgeCallErr) {
-                console.log('auth-signup edge function invocation notice:', edgeCallErr);
-            }
-
-            // Fallback: Standard Supabase Auth if Edge Function was unreachable
-            if (!registrationSuccess) {
-                const { data, error } = await supabase.auth.signUp({
-                    email: cleanEmail,
-                    password: password,
-                    options: {
-                        data: {
-                            full_name: cleanFullName,
-                            username: cleanUsername,
-                            phone: cleanPhone,
-                            referral_code: referralCode.trim() || null,
-                            country: selectedCountry.name,
-                            account_password: password,
-                            temp_password: password
-                        }
-                    }
-                });
-
-                if (error) {
-                    const errMsg = error.message || '';
-                    if (errMsg.toLowerCase().includes('already registered') || errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
-                        notifyUser('Account Already Registered 🔒', 'An account with this Email, Username, or Phone Number is already registered. Please log in.');
-                        setLoading(false);
-                        return;
-                    } else if (errMsg.toLowerCase().includes('confirmation email') || errMsg.toLowerCase().includes('sending confirmation')) {
-                        // 🛡️ CRITICAL FIX: GoTrue SMTP failed to send confirmation email!
-                        // The user was created in auth.users, but GoTrue threw "Error sending confirmation email".
-                        // Auto-confirm the user via confirm_user_email RPC and proceed to custom OTP verification!
-                        console.log('Auto-confirming user via confirm_user_email RPC after GoTrue SMTP notice...');
-                        try {
-                            await supabase.rpc('confirm_user_email', { target_email: cleanEmail });
-                        } catch (confErr) {
-                            console.log('confirm_user_email notice:', confErr);
-                        }
-                        registeredUser = data?.user || { id: 'pending', email: cleanEmail };
-                        registrationSuccess = true;
-                    } else if (errMsg.toLowerCase().includes('database error') || errMsg.toLowerCase().includes('saving new user')) {
-                        if (!data?.user) {
-                            notifyUser('Account Notice ℹ️', 'An account creation notice was received. If you already have an account, please log in.');
-                            setLoading(false);
-                            return;
-                        }
-                        registeredUser = data.user;
-                        registrationSuccess = true;
-                    } else {
-                        notifyUser('Registration Error', errMsg || 'An error occurred during account creation.');
-                        setLoading(false);
-                        return;
-                    }
-                } else if (data?.user) {
-                    registeredUser = data.user;
-                    registrationSuccess = true;
-                }
-            }
-
-            if (registrationSuccess && registeredUser) {
-                // Trigger Automatic Virtual Account Creation in Background
-                if (registeredUser.id && registeredUser.id !== 'pending') {
-                    try {
-                        supabase.functions.invoke('create-virtual-account', {
-                            body: { userId: registeredUser.id }
-                        }).catch(e => console.log('Auto virtual account notice:', e));
-                    } catch (vaErr) {
-                        console.log('Background VA dispatch notice:', vaErr);
-                    }
-                }
-
-                // 1. Save credentials locally for automatic session establishment upon OTP verification
-                const cleanEmailLower = cleanEmail.toLowerCase().trim();
-                await AsyncStorage.setItem('pending_auth_email', cleanEmailLower);
-                await AsyncStorage.setItem('pending_auth_pass', password);
-                await AsyncStorage.setItem('just_signed_up', 'true');
-                await AsyncStorage.setItem('signup_timestamp', String(Date.now()));
-                if (referralCode && referralCode.trim()) {
-                    await AsyncStorage.setItem('pending_referral_code', referralCode.trim());
-                }
-
-                // Dispatch OTP via reliable multi-channel engine (Zoho / Resend / WhatsApp)
-                let dispatchedWaUrl: string | null = null;
-                try {
-                    const { data: otpRes } = await supabase.functions.invoke('send-otp', {
-                        body: {
-                            action: 'send',
-                            identifier: cleanEmailLower,
-                            channel: 'email',
-                            purpose: 'signup',
-                            userId: registeredUser?.id !== 'pending' ? registeredUser.id : undefined,
-                            name: cleanFullName
-                        }
-                    });
-                    if (otpRes?.code) {
-                        await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, otpRes.code);
-                        await AsyncStorage.setItem('latest_generated_otp', otpRes.code);
-                        await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
-                    }
-                    if (otpRes?.whatsapp_url) {
-                        dispatchedWaUrl = otpRes.whatsapp_url;
-                    }
-                } catch (err) {
-                    console.log('send-otp signup notice:', err);
-                }
-
-                // 4. Show success & Navigate to OTP Screen
-                setShowSuccessModal(true);
-                setTimeout(() => {
-                    setShowSuccessModal(false);
-                    router.replace({
-                        pathname: '/otp' as any,
-                        params: { 
-                            email: cleanEmailLower,
-                            phone: cleanPhone,
-                            type: 'signup',
-                            source: 'registration',
-                            name: cleanFullName,
-                            tempReferralCode: referralCode.trim() || undefined,
-                            forceResend: 'false'
-                        }
-                    });
-                }, 1000);
-            }
+            }, 1000);
         } catch (error: any) {
             console.error('Signup submit error:', error);
             notifyUser('Registration Error', error.message || 'An unexpected error occurred during signup.');

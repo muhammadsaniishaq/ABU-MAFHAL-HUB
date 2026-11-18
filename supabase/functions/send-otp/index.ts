@@ -325,9 +325,9 @@ serve(async (req) => {
                 );
 
                 if (emailRes && emailRes.success) {
-                    deliveryResult = { success: true, channel: 'email', details: 'Sent via Email' };
+                    deliveryResult = { success: true, channel: 'email', details: `Sent via ${emailRes.method || 'Email'}` };
                 } else {
-                    deliveryResult = { success: false, channel: 'email', details: 'Email delivery failed' };
+                    deliveryResult = { success: false, channel: 'email', details: emailRes?.error || 'Email delivery failed' };
                 }
             }
 

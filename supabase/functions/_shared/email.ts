@@ -79,7 +79,66 @@ export const sendEmail = async (
 
     let lastSmtpError: string | null = null;
 
-    // METHOD 1: SMTP / Nodemailer (Zoho, Gmail, or Custom Server)
+    // METHOD 1: Resend HTTP API (Verified domain abumafhal.com.ng - Instant sub-second delivery)
+    if (resendApiKey) {
+        try {
+            // Use verified domain sender admin@abumafhal.com.ng
+            let resendFrom = senderFromEmail || 'Abu Mafhal Sub <admin@abumafhal.com.ng>';
+            
+            console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
+            const resendRes = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${resendApiKey.trim()}`
+                },
+                body: JSON.stringify({
+                    from: resendFrom,
+                    to: [to],
+                    reply_to: zohoUser ? zohoUser.trim() : 'admin@abumafhal.com.ng',
+                    subject,
+                    text,
+                    html: finalHtml,
+                    headers: {
+                        'X-Entity-Ref-ID': `${Date.now()}`
+                    }
+                })
+            });
+
+            const resData = await resendRes.json();
+            if (resendRes.ok && resData?.id) {
+                console.log("[sendEmail] Email successfully sent via Resend API:", resData.id);
+                return { success: true, method: 'Resend', id: resData.id, resData };
+            } else {
+                console.warn("[sendEmail] Resend primary sender notice:", resData);
+                // Fallback attempt with notifications@abumafhal.com.ng
+                if (resData?.message && resData.message.includes('from')) {
+                    const fallbackRes = await fetch('https://api.resend.com/emails', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${resendApiKey.trim()}`
+                        },
+                        body: JSON.stringify({
+                            from: 'Abu Mafhal Sub <notifications@abumafhal.com.ng>',
+                            to: [to],
+                            subject,
+                            text,
+                            html: finalHtml
+                        })
+                    });
+                    const fbData = await fallbackRes.json();
+                    if (fallbackRes.ok && fbData?.id) {
+                        return { success: true, method: 'Resend-Notifications', id: fbData.id, fbData };
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.error("[sendEmail] Resend API exception:", err);
+        }
+    }
+
+    // METHOD 2: SMTP / Nodemailer (Zoho, Gmail, or Custom Server)
     if (zohoUser && zohoPass) {
         try {
             const senderAddress = `"Abu Mafhal Sub" <${zohoUser.trim()}>`;
@@ -98,9 +157,9 @@ export const sendEmail = async (
                 tls: {
                     rejectUnauthorized: false
                 },
-                connectionTimeout: 10000,
-                greetingTimeout: 10000,
-                socketTimeout: 15000,
+                connectionTimeout: 8000,
+                greetingTimeout: 8000,
+                socketTimeout: 10000,
             });
 
             const info = await transporter.sendMail({
@@ -124,66 +183,6 @@ export const sendEmail = async (
         } catch (smtpErr: any) {
             lastSmtpError = smtpErr?.message || String(smtpErr);
             console.error("[sendEmail] SMTP exception (attempting fallback):", lastSmtpError);
-        }
-    }
-
-    // METHOD 2: Resend HTTP API
-    if (resendApiKey) {
-        try {
-            // Determine best sender address
-            let resendFrom = senderFromEmail || (zohoUser && zohoUser.includes('@abumafhal.') ? `Abu Mafhal Sub <${zohoUser.trim()}>` : 'Abu Mafhal Sub <notifications@abumafhal.com.ng>');
-            
-            console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
-            const resendRes = await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${resendApiKey.trim()}`
-                },
-                body: JSON.stringify({
-                    from: resendFrom,
-                    to: [to],
-                    reply_to: zohoUser ? zohoUser.trim() : undefined,
-                    subject,
-                    text,
-                    html: finalHtml,
-                    headers: {
-                        'X-Entity-Ref-ID': `${Date.now()}`
-                    }
-                })
-            });
-
-            const resData = await resendRes.json();
-            if (resendRes.ok) {
-                console.log("[sendEmail] Email successfully sent via Resend API:", resData.id);
-                return { success: true, method: 'Resend', id: resData.id, resData };
-            } else {
-                console.warn("[sendEmail] Resend API error:", resData);
-                // If custom sender failed due to domain unverified, try fallback
-                if (resData?.message?.includes('domain') || resData?.name === 'validation_error') {
-                    console.log("[sendEmail] Retrying Resend with fallback sandbox address...");
-                    const retryRes = await fetch('https://api.resend.com/emails', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${resendApiKey.trim()}`
-                        },
-                        body: JSON.stringify({
-                            from: 'Abu Mafhal Sub <onboarding@resend.dev>',
-                            to: [to],
-                            subject,
-                            text,
-                            html: finalHtml
-                        })
-                    });
-                    const retryData = await retryRes.json();
-                    if (retryRes.ok) {
-                        return { success: true, method: 'Resend-Sandbox', id: retryData.id, retryData };
-                    }
-                }
-            }
-        } catch (err: any) {
-            console.error("[sendEmail] Resend API exception:", err);
         }
     }
 

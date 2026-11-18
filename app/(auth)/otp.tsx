@@ -504,8 +504,57 @@ export default function OTP() {
             await AsyncStorage.setItem(`verified_user_${normalizedEmail}`, 'true');
             await AsyncStorage.setItem(`verified_user_${targetEmail}`, 'true');
 
-            // Establish active Supabase session if pending password exists
-            if (!activeAuthSession && !isResetPassword) {
+            const isSignupFlow = params.type === 'signup' || params.mode === 'signup' || params.source === 'registration' || params.source === 'login_unconfirmed';
+            let newlyCreatedUserId: string | null = null;
+
+            // 🛡️ ONLY CREATE USER RECORD IN DB AFTER PASSING OTP VERIFICATION!
+            if (isSignupFlow) {
+                const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
+                const pendingName = params.tempFullName || params.name || (await AsyncStorage.getItem('pending_reg_full_name')) || userName;
+                const pendingUsername = params.tempUsername || (await AsyncStorage.getItem('pending_reg_username'));
+                const pendingPhone = params.tempPhone || params.phone || (await AsyncStorage.getItem('pending_reg_phone'));
+                const pendingCountry = (await AsyncStorage.getItem('pending_reg_country')) || 'Nigeria';
+                const pendingRef = params.tempReferralCode || (await AsyncStorage.getItem('pending_referral_code'));
+
+                try {
+                    const { data: createData, error: createErr } = await supabase.functions.invoke('auth-signup', {
+                        body: {
+                            email: normalizedEmail,
+                            password: pendingPass,
+                            full_name: pendingName,
+                            username: pendingUsername,
+                            phone: pendingPhone,
+                            country: pendingCountry,
+                            referral_code: pendingRef || null,
+                            skipOtp: true
+                        }
+                    });
+
+                    if (createData?.user?.id) {
+                        newlyCreatedUserId = createData.user.id;
+                    }
+                } catch (signupInvokeErr) {
+                    console.log('auth-signup in OTP error:', signupInvokeErr);
+                }
+
+                // Establish active Supabase session
+                if (pendingPass) {
+                    try {
+                        const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+                            email: normalizedEmail,
+                            password: pendingPass,
+                        });
+                        if (!signInErr && authData?.session) {
+                            await supabase.auth.setSession(authData.session);
+                            activeAuthSession = authData.session;
+                            await AsyncStorage.setItem('has_active_session', 'true');
+                            await AsyncStorage.setItem('app_unlocked', 'true');
+                        }
+                    } catch (authSessionErr) {
+                        console.log('Auto sign-in session notice in OTP:', authSessionErr);
+                    }
+                }
+            } else if (!activeAuthSession && !isResetPassword) {
                 try {
                     const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
                     const emailToLogin = (await AsyncStorage.getItem('pending_auth_email')) || normalizedEmail;
@@ -529,22 +578,27 @@ export default function OTP() {
                 await AsyncStorage.setItem('app_unlocked', 'true');
             }
 
-            // Clear used OTP
+            // Clear used OTP and temporary registration values
             await AsyncStorage.removeItem(`recovery_otp_${normalizedEmail}`);
             await AsyncStorage.removeItem(`recovery_otp_${targetEmail}`);
             await AsyncStorage.removeItem('latest_generated_otp');
+            await AsyncStorage.removeItem('pending_auth_pass');
+            await AsyncStorage.removeItem('pending_reg_full_name');
+            await AsyncStorage.removeItem('pending_reg_username');
+            await AsyncStorage.removeItem('pending_reg_phone');
 
             const { data: { user } } = await supabase.auth.getUser();
-            if (user?.id) {
-                await AsyncStorage.setItem(`verified_user_${user.id}`, 'true');
+            const confirmedUserId = user?.id || newlyCreatedUserId;
+            if (confirmedUserId) {
+                await AsyncStorage.setItem(`verified_user_${confirmedUserId}`, 'true');
                 try {
-                    await supabase.from('profiles').update({ status: 'active' }).eq('id', user.id);
+                    await supabase.from('profiles').update({ status: 'active' }).eq('id', confirmedUserId);
                 } catch (e) {}
 
                 // Trigger Automatic Virtual Account Generation in Background
                 try {
                     supabase.functions.invoke('create-virtual-account', {
-                        body: { userId: user.id }
+                        body: { userId: confirmedUserId }
                     }).catch(e => console.log('Auto virtual account notice in OTP:', e));
                 } catch (vaErr) {
                     console.log('Background VA dispatch in OTP notice:', vaErr);
@@ -555,7 +609,7 @@ export default function OTP() {
                     const pendingRef = params.tempReferralCode || (await AsyncStorage.getItem('pending_referral_code'));
                     if (pendingRef && pendingRef.trim()) {
                         await supabase.rpc('record_referral', {
-                            referee_user_id: user.id,
+                            referee_user_id: confirmedUserId,
                             referral_input: pendingRef.trim()
                         });
                         await AsyncStorage.removeItem('pending_referral_code');

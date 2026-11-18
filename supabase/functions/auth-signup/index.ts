@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
             username,
             phone,
             referral_code,
-            country = 'Nigeria'
+            country = 'Nigeria',
+            skipOtp = false
         } = body;
 
         // 1. Validation
@@ -188,8 +189,6 @@ Deno.serve(async (req) => {
                     referral_code: cleanReferral ? cleanReferral.toUpperCase() : null,
                     role: 'user',
                     status: 'active',
-                    account_password: password,
-                    temp_password: password,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
 
@@ -212,20 +211,22 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 6. Automatically dispatch 6-Digit Verification OTP via send-otp (Resend / Zoho)
-        try {
-            await supabaseAdmin.functions.invoke('send-otp', {
-                body: {
-                    action: 'send',
-                    identifier: cleanEmail,
-                    channel: 'email',
-                    purpose: 'signup',
-                    userId: newUser.id,
-                    name: cleanFullName
-                }
-            });
-        } catch (otpErr) {
-            console.warn("[auth-signup] OTP dispatch notice:", otpErr);
+        // 6. Automatically dispatch 6-Digit Verification OTP via send-otp if not skipped
+        if (!skipOtp) {
+            try {
+                await supabaseAdmin.functions.invoke('send-otp', {
+                    body: {
+                        action: 'send',
+                        identifier: cleanEmail,
+                        channel: 'email',
+                        purpose: 'signup',
+                        userId: newUser.id,
+                        name: cleanFullName
+                    }
+                });
+            } catch (otpErr) {
+                console.warn("[auth-signup] OTP dispatch notice:", otpErr);
+            }
         }
 
         // 7. Background Auto Virtual Account Dispatch
