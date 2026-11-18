@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, forceSignOut } from '../../services/supabase';
 
 const NIGERIAN_STATES = [
@@ -29,18 +30,32 @@ const NIGERIAN_STATES = [
     'Taraba', 'Yobe', 'Zamfara'
 ];
 
-function validateNigerianPhone(phone: string): { isValid: boolean; formatted: string; error?: string } {
-    const cleaned = (phone || '').replace(/\D/g, '');
-    if (cleaned.length === 11 && cleaned.startsWith('0')) {
-        return { isValid: true, formatted: cleaned };
+/**
+ * Robust Nigerian phone normalizer
+ * Handles:
+ * - 08012345678 (11 digits starting with 0)
+ * - 8012345678  (10 digits without leading 0 -> adds 0)
+ * - +2348012345678 (international with + -> converts to 080...)
+ * - 2348012345678 (international without + -> converts to 080...)
+ */
+export function normalizeNigerianPhone(raw: string): { isValid: boolean; formatted: string; error?: string } {
+    if (!raw || !raw.trim()) {
+        return { isValid: false, formatted: '', error: 'Please enter your phone number.' };
     }
-    if (cleaned.length === 10 && !cleaned.startsWith('0')) {
-        return { isValid: true, formatted: '0' + cleaned };
+    let digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('234')) {
+        digits = '0' + digits.slice(3);
     }
-    if (cleaned.startsWith('234') && cleaned.length === 13) {
-        return { isValid: true, formatted: '0' + cleaned.slice(3) };
+    if (digits.length === 10 && !digits.startsWith('0')) {
+        digits = '0' + digits;
     }
-    return { isValid: false, formatted: cleaned, error: 'Please enter a valid 11-digit phone number (e.g. 08012345678).' };
+    if (digits.length === 11 && digits.startsWith('0')) {
+        return { isValid: true, formatted: digits };
+    }
+    if (digits.length < 11) {
+        return { isValid: false, formatted: digits, error: `Incomplete phone number (${digits.length}/11 digits). Please enter full 11 digits.` };
+    }
+    return { isValid: false, formatted: digits, error: 'Please enter a valid 11-digit phone number (e.g. 08012345678).' };
 }
 
 export default function CompleteProfileScreen() {
@@ -57,6 +72,10 @@ export default function CompleteProfileScreen() {
     const [showStateModal, setShowStateModal] = useState<boolean>(false);
     const [stateSearch, setStateSearch] = useState<string>('');
 
+    // Error & Notice banners
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
     // Loading & Action states
     const [initialLoading, setInitialLoading] = useState<boolean>(true);
     const [submitting, setSubmitting] = useState<boolean>(false);
@@ -65,44 +84,91 @@ export default function CompleteProfileScreen() {
         loadUserProfile();
     }, []);
 
+    const notifyError = (title: string, message: string) => {
+        setErrorMessage(message);
+        if (Platform.OS === 'web') {
+            try {
+                // Ensure message is visible immediately
+                if (typeof window !== 'undefined' && window.alert) {
+                    window.alert(`${title}\n\n${message}`);
+                }
+            } catch (_) {}
+        } else {
+            Alert.alert(title, message);
+        }
+    };
+
     const loadUserProfile = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                router.replace('/(auth)/login' as any);
+            let activeUser = (await supabase.auth.getUser()).data.user;
+            if (!activeUser) {
+                const { data: { session } } = await supabase.auth.getSession();
+                activeUser = session?.user || null;
+            }
+
+            if (!activeUser) {
+                const cachedEmail = await AsyncStorage.getItem('pending_auth_email');
+                if (cachedEmail) {
+                    setUserEmail(cachedEmail);
+                }
+                notifyError('Session Notice', 'Authentication session not found. Please log in.');
+                setTimeout(() => {
+                    router.replace('/(auth)/login' as any);
+                }, 1500);
                 return;
             }
 
-            setUserId(user.id);
-            setUserEmail(user.email || '');
+            setUserId(activeUser.id);
+            setUserEmail(activeUser.email || '');
+
+            const cachedName = await AsyncStorage.getItem('pending_reg_full_name');
+            const cachedUsername = await AsyncStorage.getItem('pending_reg_username');
+            const cachedPhone = await AsyncStorage.getItem('pending_reg_phone');
 
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('full_name, username, phone, whatsapp_number, state')
-                .eq('id', user.id)
+                .eq('id', activeUser.id)
                 .maybeSingle();
 
-            if (profile) {
-                if (profile.full_name) setFullName(profile.full_name);
-                else if (user.user_metadata?.full_name) setFullName(user.user_metadata.full_name);
-                else if (user.user_metadata?.name) setFullName(user.user_metadata.name);
+            // 1. Full name resolution
+            if (profile?.full_name && profile.full_name.trim().length >= 2) {
+                setFullName(profile.full_name);
+            } else if (activeUser.user_metadata?.full_name) {
+                setFullName(activeUser.user_metadata.full_name);
+            } else if (activeUser.user_metadata?.name) {
+                setFullName(activeUser.user_metadata.name);
+            } else if (cachedName) {
+                setFullName(cachedName);
+            }
 
-                if (profile.username) {
-                    setUsername(profile.username);
-                } else if (user.email) {
-                    const fallbackUser = user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-                    setUsername(fallbackUser);
-                }
+            // 2. Username resolution
+            if (profile?.username && profile.username.trim().length >= 2) {
+                setUsername(profile.username);
+            } else if (activeUser.user_metadata?.username) {
+                setUsername(activeUser.user_metadata.username);
+            } else if (cachedUsername) {
+                setUsername(cachedUsername);
+            } else if (activeUser.email) {
+                const fallbackUser = activeUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                setUsername(fallbackUser);
+            }
 
-                if (profile.phone) {
-                    setPhone(profile.phone);
-                    setWhatsappNumber(profile.whatsapp_number || profile.phone);
-                }
-                if (profile.whatsapp_number && profile.phone && profile.whatsapp_number !== profile.phone) {
-                    setSameAsPhone(false);
-                    setWhatsappNumber(profile.whatsapp_number);
-                }
-                if (profile.state) setSelectedState(profile.state);
+            // 3. Phone resolution
+            const candidatePhone = profile?.phone || cachedPhone || '';
+            if (candidatePhone) {
+                const norm = normalizeNigerianPhone(candidatePhone);
+                setPhone(norm.formatted || candidatePhone);
+                setWhatsappNumber(profile?.whatsapp_number || norm.formatted || candidatePhone);
+            }
+
+            if (profile?.whatsapp_number && profile?.phone && profile.whatsapp_number !== profile.phone) {
+                setSameAsPhone(false);
+                setWhatsappNumber(profile.whatsapp_number);
+            }
+
+            if (profile?.state) {
+                setSelectedState(profile.state);
             }
         } catch (e) {
             console.error('Error loading profile in CompleteProfile:', e);
@@ -112,98 +178,162 @@ export default function CompleteProfileScreen() {
     };
 
     const handlePhoneChange = (text: string) => {
-        const cleaned = text.replace(/\D/g, '').slice(0, 11);
-        setPhone(cleaned);
+        setErrorMessage(null);
+        let cleaned = text.replace(/[^0-9+]/g, '');
+        if (cleaned.startsWith('+234')) {
+            cleaned = '0' + cleaned.slice(4);
+        } else if (cleaned.startsWith('234') && cleaned.length > 10) {
+            cleaned = '0' + cleaned.slice(3);
+        }
+        const digitsOnly = cleaned.replace(/\D/g, '').slice(0, 11);
+        setPhone(digitsOnly);
         if (sameAsPhone) {
-            setWhatsappNumber(cleaned);
+            setWhatsappNumber(digitsOnly);
         }
     };
 
     const handleWhatsappChange = (text: string) => {
-        const cleaned = text.replace(/\D/g, '').slice(0, 11);
-        setWhatsappNumber(cleaned);
+        setErrorMessage(null);
+        let cleaned = text.replace(/[^0-9+]/g, '');
+        if (cleaned.startsWith('+234')) {
+            cleaned = '0' + cleaned.slice(4);
+        } else if (cleaned.startsWith('234') && cleaned.length > 10) {
+            cleaned = '0' + cleaned.slice(3);
+        }
+        const digitsOnly = cleaned.replace(/\D/g, '').slice(0, 11);
+        setWhatsappNumber(digitsOnly);
     };
 
     const toggleSameAsPhone = (val: boolean) => {
+        setErrorMessage(null);
         setSameAsPhone(val);
         if (val) {
             setWhatsappNumber(phone);
         }
     };
 
-    // Save Profile with Strict Database Duplicate Checks
+    // Save Profile with Strict Database Duplicate Checks & Inline Error Presentation
     const handleSaveProfile = async () => {
-        if (!userId) {
-            Alert.alert('Session Error', 'Please log in again.');
+        setErrorMessage(null);
+        setSuccessMessage(null);
+
+        // Resolve active userId
+        let currentUserId = userId;
+        if (!currentUserId) {
+            const { data: { user } } = await supabase.auth.getUser();
+            currentUserId = user?.id || null;
+            if (!currentUserId) {
+                const { data: { session } } = await supabase.auth.getSession();
+                currentUserId = session?.user?.id || null;
+            }
+        }
+
+        if (!currentUserId) {
+            notifyError('Session Error', 'User authentication session not found. Please log in.');
             router.replace('/(auth)/login' as any);
             return;
         }
 
         // 1. Full Name Validation
-        if (!fullName.trim() || fullName.trim().length < 3) {
-            Alert.alert('Full Name Required', 'Please enter your genuine full name (min 3 characters).');
+        if (!fullName || !fullName.trim() || fullName.trim().length < 3) {
+            notifyError('Full Name Required ⚠️', 'Please enter your genuine full name (minimum 3 characters).');
             return;
         }
 
         // 2. Username Validation
         const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
         if (!cleanUsername || cleanUsername.length < 3) {
-            Alert.alert('Username Required', 'Please choose a valid username (min 3 characters, letters and numbers only).');
+            notifyError('Username Required ⚠️', 'Please choose a valid username (min 3 characters, letters and numbers only).');
             return;
         }
 
         // 3. Phone Number Format Validation
-        const phoneVal = validateNigerianPhone(phone);
+        const phoneVal = normalizeNigerianPhone(phone);
         if (!phoneVal.isValid) {
-            Alert.alert('Invalid Phone Number', phoneVal.error || 'Please enter an 11-digit Nigerian phone number.');
+            notifyError('Invalid Phone Number ⚠️', phoneVal.error || 'Please enter an 11-digit Nigerian phone number (e.g. 08012345678).');
             return;
         }
 
         const effectiveWhatsapp = sameAsPhone ? phoneVal.formatted : whatsappNumber.trim();
+        let waVal = phoneVal;
         if (!sameAsPhone && effectiveWhatsapp) {
-            const waVal = validateNigerianPhone(effectiveWhatsapp);
+            waVal = normalizeNigerianPhone(effectiveWhatsapp);
             if (!waVal.isValid) {
-                Alert.alert('Invalid WhatsApp Number', 'Please enter a valid 11-digit WhatsApp phone number.');
+                notifyError('Invalid WhatsApp Number ⚠️', 'Please enter a valid 11-digit WhatsApp phone number.');
                 return;
             }
         }
 
         setSubmitting(true);
         try {
-            // 🛡️ 4. DATABASE CHECK: PREVENT DUPLICATE PHONE NUMBERS (Strict anti-double check)
+            // 🛡️ 4. DATABASE CHECK: PREVENT DUPLICATE PHONE NUMBERS
+            // Check via SECURITY DEFINER function to cross RLS boundary accurately
+            try {
+                const { data: phoneOwners, error: rpcErr } = await supabase.rpc('get_user_by_whatsapp_phone', {
+                    wa_phone: phoneVal.formatted
+                });
+                if (!rpcErr && Array.isArray(phoneOwners) && phoneOwners.length > 0) {
+                    const conflict = phoneOwners.find((o: any) => o.id !== currentUserId);
+                    if (conflict) {
+                        notifyError(
+                            'Phone Number Already Registered 🔒',
+                            `The phone number ${phoneVal.formatted} is already registered to another account in our system. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.`
+                        );
+                        setSubmitting(false);
+                        return;
+                    }
+                }
+            } catch (rpcCheckErr) {
+                console.log('Phone RPC check notice:', rpcCheckErr);
+            }
+
+            // Direct database query check fallback
             const cleanDigits10 = phoneVal.formatted.slice(-10);
-            const { data: duplicatePhoneUsers, error: phoneCheckErr } = await supabase
+            const { data: duplicatePhoneUsers } = await supabase
                 .from('profiles')
                 .select('id, full_name, phone')
                 .ilike('phone', `%${cleanDigits10}`)
-                .neq('id', userId)
+                .neq('id', currentUserId)
                 .limit(1);
 
-            if (phoneCheckErr) {
-                console.warn('Phone uniqueness pre-check notice:', phoneCheckErr);
-            }
-
             if (duplicatePhoneUsers && duplicatePhoneUsers.length > 0) {
-                Alert.alert(
+                notifyError(
                     'Phone Number Already Registered 🔒',
-                    'This phone number is already registered to another account in our system. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.'
+                    `This phone number is already registered to another account. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.`
                 );
                 setSubmitting(false);
                 return;
             }
 
             // Also check WhatsApp number uniqueness if entered separately
-            if (!sameAsPhone && effectiveWhatsapp) {
-                const waDigits10 = effectiveWhatsapp.slice(-10);
+            if (!sameAsPhone && effectiveWhatsapp && waVal.formatted !== phoneVal.formatted) {
+                const waDigits10 = waVal.formatted.slice(-10);
+                try {
+                    const { data: waOwners } = await supabase.rpc('get_user_by_whatsapp_phone', {
+                        wa_phone: waVal.formatted
+                    });
+                    if (Array.isArray(waOwners) && waOwners.length > 0) {
+                        const waConflict = waOwners.find((o: any) => o.id !== currentUserId);
+                        if (waConflict) {
+                            notifyError(
+                                'WhatsApp Number In Use 🔒',
+                                `The WhatsApp number ${waVal.formatted} is already linked to another account. Please use your personal number.`
+                            );
+                            setSubmitting(false);
+                            return;
+                        }
+                    }
+                } catch (_) {}
+
                 const { data: duplicateWaUsers } = await supabase
                     .from('profiles')
                     .select('id, full_name, phone')
                     .or(`phone.ilike.%${waDigits10},whatsapp_number.ilike.%${waDigits10}`)
-                    .neq('id', userId)
+                    .neq('id', currentUserId)
                     .limit(1);
 
                 if (duplicateWaUsers && duplicateWaUsers.length > 0) {
-                    Alert.alert(
+                    notifyError(
                         'WhatsApp Number In Use 🔒',
                         'This WhatsApp number is already linked to another account. Please use your unique personal number.'
                     );
@@ -213,21 +343,17 @@ export default function CompleteProfileScreen() {
             }
 
             // 🛡️ 5. DATABASE CHECK: PREVENT DUPLICATE USERNAME
-            const { data: duplicateUsernames, error: usernameCheckErr } = await supabase
+            const { data: duplicateUsernames } = await supabase
                 .from('profiles')
                 .select('id, username')
                 .ilike('username', cleanUsername)
-                .neq('id', userId)
+                .neq('id', currentUserId)
                 .limit(1);
 
-            if (usernameCheckErr) {
-                console.warn('Username uniqueness pre-check notice:', usernameCheckErr);
-            }
-
             if (duplicateUsernames && duplicateUsernames.length > 0) {
-                Alert.alert(
+                notifyError(
                     'Username Already Taken 🔒',
-                    'This username is already taken by another user. Please choose a different username.'
+                    `The username "${cleanUsername}" is already taken by another user. Please choose a different username.`
                 );
                 setSubmitting(false);
                 return;
@@ -238,7 +364,7 @@ export default function CompleteProfileScreen() {
                 full_name: fullName.trim(),
                 username: cleanUsername,
                 phone: phoneVal.formatted,
-                whatsapp_number: effectiveWhatsapp || phoneVal.formatted,
+                whatsapp_number: waVal.formatted || phoneVal.formatted,
                 state: selectedState,
                 phone_verified: true,
                 whatsapp_verified: true,
@@ -249,7 +375,7 @@ export default function CompleteProfileScreen() {
             const { error: profileUpdateError } = await supabase
                 .from('profiles')
                 .update(updatePayload)
-                .eq('id', userId);
+                .eq('id', currentUserId);
 
             if (profileUpdateError) {
                 throw new Error(profileUpdateError.message || 'Failed to update profile record.');
@@ -258,7 +384,7 @@ export default function CompleteProfileScreen() {
             // 7. Background Auto Virtual Account Generation
             try {
                 supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: userId }
+                    body: { userId: currentUserId }
                 }).catch(() => {});
             } catch (_) {}
 
@@ -266,20 +392,14 @@ export default function CompleteProfileScreen() {
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
             }
 
-            const successNotice = 'Profile details saved successfully! Please set your 4-digit transaction PIN to secure your wallet.';
-            if (Platform.OS === 'web') {
-                alert(successNotice);
+            setSuccessMessage('Profile saved successfully! Proceeding to setup your transaction PIN...');
+
+            setTimeout(() => {
                 router.replace('/(auth)/pin-setup' as any);
-            } else {
-                Alert.alert('Profile Complete 🎉', successNotice, [
-                    {
-                        text: 'Set Transaction PIN',
-                        onPress: () => router.replace('/(auth)/pin-setup' as any)
-                    }
-                ]);
-            }
+            }, 500);
+
         } catch (err: any) {
-            Alert.alert('Update Failed ❌', err.message || 'Unable to update profile. Please try again.');
+            notifyError('Update Failed ❌', err.message || 'Unable to update profile. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -340,6 +460,31 @@ export default function CompleteProfileScreen() {
 
                     {/* Clean White Card */}
                     <View style={styles.card}>
+                        {/* 🚨 VISIBLE ERROR BANNER */}
+                        {errorMessage && (
+                            <View style={styles.errorBannerBox}>
+                                <Ionicons name="alert-circle" size={22} color="#DC2626" style={{ marginRight: 8, marginTop: 1 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.errorBannerTitle}>Input Required</Text>
+                                    <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setErrorMessage(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Ionicons name="close" size={18} color="#991B1B" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* ✅ VISIBLE SUCCESS BANNER */}
+                        {successMessage && (
+                            <View style={styles.successBannerBox}>
+                                <Ionicons name="checkmark-circle" size={22} color="#16A34A" style={{ marginRight: 8, marginTop: 1 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.successBannerTitle}>Profile Saved</Text>
+                                    <Text style={styles.successBannerText}>{successMessage}</Text>
+                                </View>
+                            </View>
+                        )}
+
                         {/* Email (Read Only - Authenticated) */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.microLabel}>AUTHENTICATED EMAIL</Text>
@@ -366,7 +511,10 @@ export default function CompleteProfileScreen() {
                                     placeholder="e.g. Muhammad Sani Isyaku"
                                     placeholderTextColor="#94A3B8"
                                     value={fullName}
-                                    onChangeText={setFullName}
+                                    onChangeText={(t) => {
+                                        setErrorMessage(null);
+                                        setFullName(t);
+                                    }}
                                     autoCapitalize="words"
                                 />
                             </View>
@@ -384,7 +532,10 @@ export default function CompleteProfileScreen() {
                                     placeholder="e.g. sani_hub"
                                     placeholderTextColor="#94A3B8"
                                     value={username}
-                                    onChangeText={t => setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                                    onChangeText={(t) => {
+                                        setErrorMessage(null);
+                                        setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                                    }}
                                     autoCapitalize="none"
                                 />
                             </View>
@@ -407,7 +558,7 @@ export default function CompleteProfileScreen() {
                                     value={phone}
                                     onChangeText={handlePhoneChange}
                                     keyboardType="phone-pad"
-                                    maxLength={11}
+                                    maxLength={14}
                                 />
                             </View>
                             <Text style={styles.helperText}>Each account must have a unique personal phone number.</Text>
@@ -450,7 +601,7 @@ export default function CompleteProfileScreen() {
                                         value={whatsappNumber}
                                         onChangeText={handleWhatsappChange}
                                         keyboardType="phone-pad"
-                                        maxLength={11}
+                                        maxLength={14}
                                     />
                                 </View>
                             </View>
@@ -475,7 +626,7 @@ export default function CompleteProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Primary Action Button (No WhatsApp OTP gating) */}
+                        {/* Primary Action Button (Direct proceed to PIN Setup) */}
                         <View style={styles.actionContainer}>
                             <TouchableOpacity
                                 style={[styles.primaryButton, submitting && styles.disabledButton]}
@@ -674,6 +825,50 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.04,
         shadowRadius: 10,
         elevation: 3,
+    },
+    errorBannerBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1.5,
+        borderColor: '#F87171',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+    },
+    errorBannerTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#991B1B',
+        marginBottom: 2,
+    },
+    errorBannerText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#B91C1C',
+        lineHeight: 16,
+    },
+    successBannerBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1.5,
+        borderColor: '#86EFAC',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+    },
+    successBannerTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#166534',
+        marginBottom: 2,
+    },
+    successBannerText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#15803D',
+        lineHeight: 16,
     },
     inputGroup: {
         marginBottom: 14,
