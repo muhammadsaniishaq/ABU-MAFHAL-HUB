@@ -53,6 +53,44 @@ serve(async (req) => {
         }
 
         // ==========================================
+        // ACTION: CHECK DUPLICATE PHONE / IDENTIFIER
+        // ==========================================
+        if (action === 'check_phone' || action === 'check_duplicate') {
+            const rawDigits = (identifier || '').replace(/\D/g, '');
+            if (!rawDigits || rawDigits.length < 10) {
+                return new Response(JSON.stringify({ success: true, is_duplicate: false }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
+                });
+            }
+            const last10 = rawDigits.slice(-10);
+
+            const { data: matchedProfiles, error: pErr } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, phone, whatsapp_number')
+                .or(`phone.ilike.%${last10},whatsapp_number.ilike.%${last10}`)
+                .limit(10);
+
+            if (pErr) {
+                console.error("[send-otp] check_duplicate error:", pErr);
+            }
+
+            const duplicate = matchedProfiles?.find((p: any) => p.id !== userId);
+
+            return new Response(JSON.stringify({
+                success: true,
+                is_duplicate: !!duplicate,
+                duplicate_user: duplicate ? { id: duplicate.id, full_name: duplicate.full_name } : null,
+                message: duplicate
+                    ? 'This phone number is already registered to another account in our system. Duplicate phone numbers are strictly prohibited.'
+                    : 'Available'
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
+            });
+        }
+
+        // ==========================================
         // ACTION: SEND OTP
         // ==========================================
         if (action === 'send') {
@@ -65,6 +103,29 @@ serve(async (req) => {
 
             const cleanId = identifier.trim().toLowerCase();
             const targetChannel = (channel || (cleanId.includes('@') ? 'email' : 'whatsapp')).toLowerCase();
+
+            // 🛡️ Strict anti-duplicate check for profile_completion or phone registration
+            const digitsOnly = cleanId.replace(/\D/g, '');
+            if (digitsOnly.length >= 10 && (purpose === 'profile_completion' || purpose === 'signup' || targetChannel === 'whatsapp' || targetChannel === 'sms')) {
+                const last10 = digitsOnly.slice(-10);
+                const { data: duplicateProfiles } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id, full_name, phone, whatsapp_number')
+                    .or(`phone.ilike.%${last10},whatsapp_number.ilike.%${last10}`)
+                    .limit(10);
+
+                const conflict = duplicateProfiles?.find((p: any) => p.id !== userId);
+                if (conflict) {
+                    return new Response(JSON.stringify({
+                        success: false,
+                        is_duplicate: true,
+                        message: `The phone number ${identifier} is already registered to another account. Duplicate phone numbers are strictly prohibited.`
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 400
+                    });
+                }
+            }
 
             // Rate limiting check: Max 4 OTPs sent in the last 10 minutes to same identifier
             const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,13 +12,15 @@ import {
     StyleSheet,
     Modal,
     Switch,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, forceSignOut } from '../../services/supabase';
 
@@ -80,15 +82,33 @@ export default function CompleteProfileScreen() {
     const [initialLoading, setInitialLoading] = useState<boolean>(true);
     const [submitting, setSubmitting] = useState<boolean>(false);
 
+    // WhatsApp OTP Modal State
+    const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
+    const [otpCode, setOtpCode] = useState<string[]>(new Array(6).fill(''));
+    const [otpLoading, setOtpLoading] = useState<boolean>(false);
+    const [otpCountdown, setOtpCountdown] = useState<number>(60);
+    const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
+    const [activeWaTarget, setActiveWaTarget] = useState<string>('');
+    const otpInputRefs = useRef<Array<TextInput | null>>([]);
+
     useEffect(() => {
         loadUserProfile();
     }, []);
+
+    useEffect(() => {
+        let timer: any;
+        if (showOtpModal && otpCountdown > 0) {
+            timer = setInterval(() => setOtpCountdown(c => c - 1), 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [showOtpModal, otpCountdown]);
 
     const notifyError = (title: string, message: string) => {
         setErrorMessage(message);
         if (Platform.OS === 'web') {
             try {
-                // Ensure message is visible immediately
                 if (typeof window !== 'undefined' && window.alert) {
                     window.alert(`${title}\n\n${message}`);
                 }
@@ -212,12 +232,11 @@ export default function CompleteProfileScreen() {
         }
     };
 
-    // Save Profile with Strict Database Duplicate Checks & Inline Error Presentation
-    const handleSaveProfile = async () => {
+    // Step 1: Pre-validation & Strict Anti-Duplicate Check before launching WhatsApp OTP
+    const handleInitiateVerification = async () => {
         setErrorMessage(null);
         setSuccessMessage(null);
 
-        // Resolve active userId
         let currentUserId = userId;
         if (!currentUserId) {
             const { data: { user } } = await supabase.auth.getUser();
@@ -266,83 +285,46 @@ export default function CompleteProfileScreen() {
 
         setSubmitting(true);
         try {
-            // 🛡️ 4. DATABASE CHECK: PREVENT DUPLICATE PHONE NUMBERS
-            // Check via SECURITY DEFINER function to cross RLS boundary accurately
-            try {
-                const { data: phoneOwners, error: rpcErr } = await supabase.rpc('get_user_by_whatsapp_phone', {
-                    wa_phone: phoneVal.formatted
-                });
-                if (!rpcErr && Array.isArray(phoneOwners) && phoneOwners.length > 0) {
-                    const conflict = phoneOwners.find((o: any) => o.id !== currentUserId);
-                    if (conflict) {
-                        notifyError(
-                            'Phone Number Already Registered 🔒',
-                            `The phone number ${phoneVal.formatted} is already registered to another account in our system. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.`
-                        );
-                        setSubmitting(false);
-                        return;
-                    }
+            // 🛡️ 4. STRICT DATABASE CHECK: PREVENT DUPLICATE PHONE NUMBER ACROSS ALL PROFILES
+            // Check via Edge Function (runs with service role key, bypassing RLS completely)
+            const { data: phoneCheckData, error: phoneCheckErr } = await supabase.functions.invoke('send-otp', {
+                body: {
+                    action: 'check_duplicate',
+                    identifier: phoneVal.formatted,
+                    userId: currentUserId
                 }
-            } catch (rpcCheckErr) {
-                console.log('Phone RPC check notice:', rpcCheckErr);
-            }
+            });
 
-            // Direct database query check fallback
-            const cleanDigits10 = phoneVal.formatted.slice(-10);
-            const { data: duplicatePhoneUsers } = await supabase
-                .from('profiles')
-                .select('id, full_name, phone')
-                .ilike('phone', `%${cleanDigits10}`)
-                .neq('id', currentUserId)
-                .limit(1);
-
-            if (duplicatePhoneUsers && duplicatePhoneUsers.length > 0) {
+            if (phoneCheckData?.is_duplicate) {
                 notifyError(
                     'Phone Number Already Registered 🔒',
-                    `This phone number is already registered to another account. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.`
+                    `The phone number ${phoneVal.formatted} is already registered to another account in our system. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.`
                 );
                 setSubmitting(false);
                 return;
             }
 
-            // Also check WhatsApp number uniqueness if entered separately
-            if (!sameAsPhone && effectiveWhatsapp && waVal.formatted !== phoneVal.formatted) {
-                const waDigits10 = waVal.formatted.slice(-10);
-                try {
-                    const { data: waOwners } = await supabase.rpc('get_user_by_whatsapp_phone', {
-                        wa_phone: waVal.formatted
-                    });
-                    if (Array.isArray(waOwners) && waOwners.length > 0) {
-                        const waConflict = waOwners.find((o: any) => o.id !== currentUserId);
-                        if (waConflict) {
-                            notifyError(
-                                'WhatsApp Number In Use 🔒',
-                                `The WhatsApp number ${waVal.formatted} is already linked to another account. Please use your personal number.`
-                            );
-                            setSubmitting(false);
-                            return;
-                        }
+            // Check WhatsApp Number for duplicates if different
+            if (!sameAsPhone && waVal.formatted !== phoneVal.formatted) {
+                const { data: waCheckData } = await supabase.functions.invoke('send-otp', {
+                    body: {
+                        action: 'check_duplicate',
+                        identifier: waVal.formatted,
+                        userId: currentUserId
                     }
-                } catch (_) {}
+                });
 
-                const { data: duplicateWaUsers } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, phone')
-                    .or(`phone.ilike.%${waDigits10},whatsapp_number.ilike.%${waDigits10}`)
-                    .neq('id', currentUserId)
-                    .limit(1);
-
-                if (duplicateWaUsers && duplicateWaUsers.length > 0) {
+                if (waCheckData?.is_duplicate) {
                     notifyError(
                         'WhatsApp Number In Use 🔒',
-                        'This WhatsApp number is already linked to another account. Please use your unique personal number.'
+                        `The WhatsApp number ${waVal.formatted} is already linked to another account. Please use your personal number.`
                     );
                     setSubmitting(false);
                     return;
                 }
             }
 
-            // 🛡️ 5. DATABASE CHECK: PREVENT DUPLICATE USERNAME
+            // 🛡️ 5. STRICT DATABASE CHECK: PREVENT DUPLICATE USERNAME
             const { data: duplicateUsernames } = await supabase
                 .from('profiles')
                 .select('id, username')
@@ -359,7 +341,146 @@ export default function CompleteProfileScreen() {
                 return;
             }
 
-            // 6. Direct Database Update (Profiles)
+            // 🚀 6. DISPATCH WHATSAPP OTP VIA SEND-OTP EDGE FUNCTION
+            const targetIdentifier = waVal.formatted;
+            setActiveWaTarget(targetIdentifier);
+
+            const { data: sendData, error: sendErr } = await supabase.functions.invoke('send-otp', {
+                body: {
+                    action: 'send',
+                    identifier: targetIdentifier,
+                    channel: 'whatsapp',
+                    purpose: 'profile_completion',
+                    userId: currentUserId,
+                    name: fullName.trim(),
+                }
+            });
+
+            if (sendErr || sendData?.success === false) {
+                throw new Error(sendData?.message || sendErr?.message || 'Failed to dispatch WhatsApp verification code.');
+            }
+
+            if (sendData?.whatsapp_url) {
+                setWhatsappUrl(sendData.whatsapp_url);
+            }
+
+            setOtpCode(new Array(6).fill(''));
+            setOtpCountdown(60);
+            setShowOtpModal(true);
+
+            if (Platform.OS !== 'web') {
+                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
+            }
+        } catch (err: any) {
+            notifyError('Verification Notice ⚠️', err.message || 'Unable to dispatch WhatsApp code. Please check your phone number and try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // OTP Digit Inputs Handling
+    const handleOtpDigitChange = (val: string, index: number) => {
+        const cleanDigits = val.replace(/\D/g, '');
+        if (cleanDigits.length >= 6) {
+            const digits = cleanDigits.slice(0, 6).split('');
+            setOtpCode(digits);
+            handleVerifyCode(cleanDigits.slice(0, 6));
+            return;
+        }
+
+        const value = cleanDigits.slice(-1);
+        const newCode = [...otpCode];
+        newCode[index] = value;
+        setOtpCode(newCode);
+
+        if (value && index < 5) {
+            otpInputRefs.current[index + 1]?.focus();
+        }
+
+        if (newCode.every(d => d !== '') && newCode.join('').length === 6) {
+            handleVerifyCode(newCode.join(''));
+        }
+    };
+
+    const handleOtpKeyPress = (e: any, index: number) => {
+        if (e.nativeEvent.key === 'Backspace' && !otpCode[index] && index > 0) {
+            otpInputRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const handlePasteClipboard = async () => {
+        try {
+            const text = await Clipboard.getStringAsync();
+            const cleanDigits = text.replace(/\D/g, '').slice(0, 6);
+            if (cleanDigits.length === 6) {
+                setOtpCode(cleanDigits.split(''));
+                handleVerifyCode(cleanDigits);
+            } else {
+                notifyError('Clipboard Notice', 'Clipboard does not contain a 6-digit verification code.');
+            }
+        } catch (_) {}
+    };
+
+    const handleResendWhatsappOtp = async () => {
+        if (otpCountdown > 0 || otpLoading) return;
+        setOtpLoading(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('send-otp', {
+                body: {
+                    action: 'send',
+                    identifier: activeWaTarget || phone,
+                    channel: 'whatsapp',
+                    purpose: 'profile_completion',
+                    userId: userId,
+                    name: fullName.trim(),
+                }
+            });
+
+            if (error || data?.success === false) {
+                throw new Error(data?.message || 'Failed to resend WhatsApp code.');
+            }
+
+            if (data?.whatsapp_url) {
+                setWhatsappUrl(data.whatsapp_url);
+            }
+
+            setOtpCountdown(60);
+            const notice = `Fresh 6-digit WhatsApp code sent to ${activeWaTarget || phone}!`;
+            if (Platform.OS === 'web') alert(notice);
+            else Alert.alert('Code Sent 🟢', notice);
+        } catch (err: any) {
+            Alert.alert('Resend Failed', err.message || 'Unable to resend OTP.');
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    // Step 2: Verify WhatsApp OTP and Commit Profile Updates to Database
+    const handleVerifyCode = async (codeToVerify: string) => {
+        if (codeToVerify.length !== 6 || otpLoading) return;
+
+        setOtpLoading(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('send-otp', {
+                body: {
+                    action: 'verify',
+                    identifier: activeWaTarget || phone,
+                    code: codeToVerify,
+                    purpose: 'profile_completion',
+                    userId: userId,
+                }
+            });
+
+            if (error || data?.success === false) {
+                throw new Error(data?.message || 'Invalid or expired WhatsApp OTP code. Please check and try again.');
+            }
+
+            // Direct Database Update
+            const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+            const phoneVal = normalizeNigerianPhone(phone);
+            const effectiveWhatsapp = sameAsPhone ? phoneVal.formatted : whatsappNumber.trim();
+            const waVal = normalizeNigerianPhone(effectiveWhatsapp);
+
             const updatePayload: Record<string, any> = {
                 full_name: fullName.trim(),
                 username: cleanUsername,
@@ -375,33 +496,36 @@ export default function CompleteProfileScreen() {
             const { error: profileUpdateError } = await supabase
                 .from('profiles')
                 .update(updatePayload)
-                .eq('id', currentUserId);
+                .eq('id', userId);
 
             if (profileUpdateError) {
                 throw new Error(profileUpdateError.message || 'Failed to update profile record.');
             }
 
-            // 7. Background Auto Virtual Account Generation
+            // Background Auto Virtual Account Generation
             try {
                 supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: currentUserId }
+                    body: { userId: userId }
                 }).catch(() => {});
             } catch (_) {}
+
+            setShowOtpModal(false);
 
             if (Platform.OS !== 'web') {
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
             }
 
-            setSuccessMessage('Profile saved successfully! Proceeding to setup your transaction PIN...');
+            const successMsg = 'Profile & WhatsApp verified successfully! Proceeding to setup your 4-digit transaction PIN...';
+            setSuccessMessage(successMsg);
 
             setTimeout(() => {
                 router.replace('/(auth)/pin-setup' as any);
-            }, 500);
+            }, 600);
 
         } catch (err: any) {
-            notifyError('Update Failed ❌', err.message || 'Unable to update profile. Please try again.');
+            Alert.alert('Verification Failed ❌', err.message || 'Invalid WhatsApp code. Please check and try again.');
         } finally {
-            setSubmitting(false);
+            setOtpLoading(false);
         }
     };
 
@@ -572,7 +696,7 @@ export default function CompleteProfileScreen() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.switchTitle}>Same WhatsApp Number</Text>
-                                    <Text style={styles.switchSubtitle}>Use your phone number for official notifications</Text>
+                                    <Text style={styles.switchSubtitle}>Use your phone number for WhatsApp verification</Text>
                                 </View>
                             </View>
                             <Switch
@@ -626,11 +750,11 @@ export default function CompleteProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Primary Action Button (Direct proceed to PIN Setup) */}
+                        {/* Primary Action Button (Triggers WhatsApp OTP Verification) */}
                         <View style={styles.actionContainer}>
                             <TouchableOpacity
                                 style={[styles.primaryButton, submitting && styles.disabledButton]}
-                                onPress={handleSaveProfile}
+                                onPress={handleInitiateVerification}
                                 disabled={submitting}
                                 activeOpacity={0.85}
                             >
@@ -644,8 +768,9 @@ export default function CompleteProfileScreen() {
                                         <ActivityIndicator color="#FFFFFF" size="small" />
                                     ) : (
                                         <View style={styles.btnContentRow}>
-                                            <Text style={styles.primaryButtonText}>Complete Profile & Proceed</Text>
-                                            <Ionicons name="arrow-forward" size={17} color="#D4AF37" style={{ marginLeft: 8 }} />
+                                            <Ionicons name="logo-whatsapp" size={18} color="#25D366" style={{ marginRight: 8 }} />
+                                            <Text style={styles.primaryButtonText}>Verify on WhatsApp & Proceed</Text>
+                                            <Ionicons name="arrow-forward" size={16} color="#D4AF37" style={{ marginLeft: 8 }} />
                                         </View>
                                     )}
                                 </LinearGradient>
@@ -728,6 +853,112 @@ export default function CompleteProfileScreen() {
                                 </View>
                             )}
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 🟢 Ultra-Modern Executive Light WhatsApp OTP Modal */}
+            <Modal
+                visible={showOtpModal}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowOtpModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.otpModalCard}>
+                        {/* WhatsApp Emblem */}
+                        <View style={styles.otpIconBadgeWa}>
+                            <Ionicons name="logo-whatsapp" size={28} color="#16A34A" />
+                        </View>
+
+                        <Text style={styles.otpTitle}>Verify WhatsApp</Text>
+                        <Text style={styles.otpSubtitle}>
+                            We sent a 6-digit security code directly to your WhatsApp on{' '}
+                            <Text style={styles.otpHighlight}>{activeWaTarget || phone}</Text>
+                        </Text>
+
+                        {/* Open WhatsApp Direct Button */}
+                        {whatsappUrl && (
+                            <TouchableOpacity
+                                style={styles.openWhatsappPill}
+                                onPress={() => Linking.openURL(whatsappUrl).catch(() => {})}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
+                                <Text style={styles.openWhatsappText}>Open WhatsApp to View Code</Text>
+                                <Ionicons name="open-outline" size={13} color="#16A34A" />
+                            </TouchableOpacity>
+                        )}
+
+                        {/* 6 Digit Inputs */}
+                        <View style={styles.otpRow}>
+                            {otpCode.map((digit, idx) => (
+                                <TextInput
+                                    key={idx}
+                                    ref={ref => { otpInputRefs.current[idx] = ref; }}
+                                    style={[
+                                        styles.otpBox,
+                                        digit ? styles.otpBoxFilled : null
+                                    ]}
+                                    value={digit}
+                                    onChangeText={v => handleOtpDigitChange(v, idx)}
+                                    onKeyPress={e => handleOtpKeyPress(e, idx)}
+                                    keyboardType="number-pad"
+                                    maxLength={1}
+                                    textAlign="center"
+                                    selectTextOnFocus
+                                />
+                            ))}
+                        </View>
+
+                        {/* Actions: Paste and Resend */}
+                        <View style={styles.otpHelperRow}>
+                            <TouchableOpacity style={styles.pasteBtn} onPress={handlePasteClipboard}>
+                                <Ionicons name="clipboard-outline" size={15} color="#B45309" />
+                                <Text style={styles.pasteText}>Paste Code</Text>
+                            </TouchableOpacity>
+
+                            {otpCountdown > 0 ? (
+                                <Text style={styles.timerText}>Resend in {otpCountdown}s</Text>
+                            ) : (
+                                <TouchableOpacity onPress={handleResendWhatsappOtp} disabled={otpLoading}>
+                                    <Text style={styles.resendText}>Resend Code</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Primary Verify Button */}
+                        <TouchableOpacity
+                            style={[styles.primaryButton, { width: '100%', marginBottom: 10 }]}
+                            onPress={() => handleVerifyCode(otpCode.join(''))}
+                            disabled={otpLoading || otpCode.join('').length !== 6}
+                            activeOpacity={0.85}
+                        >
+                            <LinearGradient
+                                colors={['#0A1128', '#111D3B']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.buttonGradient}
+                            >
+                                {otpLoading ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                    <View style={styles.btnContentRow}>
+                                        <Text style={styles.primaryButtonText}>Verify & Complete Profile</Text>
+                                        <Ionicons name="checkmark-done" size={17} color="#D4AF37" style={{ marginLeft: 8 }} />
+                                    </View>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        {/* Cancel / Change Number */}
+                        <TouchableOpacity
+                            style={styles.cancelOtpButton}
+                            onPress={() => setShowOtpModal(false)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.cancelOtpText}>Change Phone Number</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -1096,5 +1327,125 @@ const styles = StyleSheet.create({
     selectedStateItemText: {
         color: '#B45309',
         fontWeight: '800',
+    },
+    // Executive Modern Light OTP Modal Styling
+    otpModalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 22,
+        width: '100%',
+        maxWidth: 360,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        alignItems: 'center',
+        shadowColor: '#071435',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    otpIconBadgeWa: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#DCFCE7',
+        borderWidth: 1.5,
+        borderColor: '#86EFAC',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    otpTitle: {
+        fontSize: 19,
+        fontWeight: '900',
+        color: '#071435',
+        letterSpacing: -0.2,
+    },
+    otpSubtitle: {
+        fontSize: 12,
+        color: '#64748B',
+        textAlign: 'center',
+        marginTop: 5,
+        lineHeight: 17,
+        paddingHorizontal: 6,
+    },
+    otpHighlight: {
+        color: '#0F766E',
+        fontWeight: '800',
+    },
+    openWhatsappPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#DCFCE7',
+        borderColor: '#86EFAC',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginTop: 12,
+        marginBottom: 12,
+    },
+    openWhatsappText: {
+        color: '#16A34A',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    otpRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
+        marginVertical: 14,
+    },
+    otpBox: {
+        width: 44,
+        height: 50,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#CBD5E1',
+        color: '#071435',
+        fontSize: 22,
+        fontWeight: '900',
+    },
+    otpBoxFilled: {
+        borderColor: '#10B981',
+        backgroundColor: '#ECFDF5',
+        color: '#065F46',
+    },
+    otpHelperRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    pasteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    pasteText: {
+        color: '#B45309',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    timerText: {
+        color: '#64748B',
+        fontSize: 11.5,
+    },
+    resendText: {
+        color: '#16A34A',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    cancelOtpButton: {
+        paddingVertical: 6,
+    },
+    cancelOtpText: {
+        color: '#64748B',
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
