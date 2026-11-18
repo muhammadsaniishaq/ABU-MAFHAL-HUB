@@ -134,6 +134,26 @@ export default function AdminAppUpdate() {
     'A new update featuring AI performance enhancements is now available. Tap to update directly on Google Play!'
   );
 
+  // WhatsApp Broadcast Configuration
+  const [broadcastWhatsApp, setBroadcastWhatsApp] = useState(true);
+  const [broadcastingWhatsApp, setBroadcastingWhatsApp] = useState(false);
+  const [totalWhatsAppUsers, setTotalWhatsAppUsers] = useState<number>(0);
+  const [whatsappMessage, setWhatsappMessage] = useState(
+    '🚀 *SABON APPLICATION VERSION YA FITO! (NEW UPDATE ALERT)*\n\n' +
+    'Sanarwa ga dukkan abokan huldar *ABU MAFHAL SUB*:\n\n' +
+    'An fitar da sabon Application Update: *v{{version}}*!\n\n' +
+    '🌟 *Abubuwan da aka inganta (Highlights):*\n' +
+    '• ⚡ 0.4s Sub-Second VTU Execution (Saurin Aiki)\n' +
+    '• 🛡️ Bank-grade Security & 2FA Device Shield\n' +
+    '• 📲 Sabbin tsare-tsaren Data, Airtime & Bill Payments\n' +
+    '• 🔄 Ingantaccen Virtual Account & Realtime Sync\n\n' +
+    '📥 *Danna nan domin sabuntawa kai tsaye (Download / Update Now):*\n' +
+    '🔗 Google Play Store:\n' +
+    '{{playStoreUrl}}\n\n' +
+    'Ku gaggauta sabunta manhajarku domin cin gajiyar sabbin tsare-tsare masu inganci da sauri.\n\n' +
+    'Nagode da kasancewa tare da *ABU MAFHAL SUB*! 🛡️⚡'
+  );
+
   // Installed app version from Expo Constants
   const installedAppVersion = Constants?.expoConfig?.version || '1.0.4';
 
@@ -144,6 +164,18 @@ export default function AdminAppUpdate() {
   const fetchUpdateSettings = async () => {
     try {
       setLoading(true);
+
+      // Fetch user count for live WhatsApp broadcast counter
+      try {
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .or('phone.not.is.null,whatsapp_number.not.is.null');
+        if (typeof count === 'number') {
+          setTotalWhatsAppUsers(count);
+        }
+      } catch (_) {}
+
       const { data, error } = await supabase.from('app_settings').select('*');
       if (error) throw error;
 
@@ -278,6 +310,99 @@ export default function AdminAppUpdate() {
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not dispatch test notification.');
     }
+  };
+
+  const handleTestWhatsAppAdmin = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let adminPhone = '09065645747';
+      if (user?.id) {
+        const { data: prof } = await supabase.from('profiles').select('phone, whatsapp_number').eq('id', user.id).maybeSingle();
+        if (prof?.whatsapp_number || prof?.phone) {
+          adminPhone = prof.whatsapp_number || prof.phone;
+        }
+      }
+
+      const targetUrl = playStoreUrl.trim() || DEFAULT_PLAY_STORE_URL;
+      const finalMsg = whatsappMessage
+        .replace(/{{version}}/g, latestAppVersion.trim())
+        .replace(/{{playStoreUrl}}/g, targetUrl)
+        .replace(/{{apkUrl}}/g, apkDownloadUrl.trim() ? `🔗 Direct APK Download Link:\n${apkDownloadUrl.trim()}\n` : '');
+
+      const { data, error } = await supabase.functions.invoke('send-communication', {
+        body: {
+          type: 'whatsapp',
+          recipient_mode: 'single',
+          recipient: adminPhone,
+          subject: `⚡ Test Update v${latestAppVersion.trim()}`,
+          body: finalMsg,
+          version: latestAppVersion.trim(),
+          playStoreUrl: targetUrl,
+          apkUrl: apkDownloadUrl.trim()
+        }
+      });
+
+      if (error || data?.success === false) {
+        throw new Error(data?.message || error?.message || 'Failed to dispatch test WhatsApp');
+      }
+
+      Alert.alert('Test Sent 🟢', `Test WhatsApp announcement dispatched to admin line (${adminPhone}). Check your WhatsApp!`);
+    } catch (e: any) {
+      Alert.alert('Test Failed', e.message || 'Could not send test WhatsApp message.');
+    }
+  };
+
+  const handleInstantBroadcastWhatsApp = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+    Alert.alert(
+      'Broadcast to All WhatsApp Users? 📢',
+      `This will immediately send the official WhatsApp update announcement for v${latestAppVersion} to all registered users (${totalWhatsAppUsers || 'all'}). Do you want to proceed?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Broadcast',
+          onPress: async () => {
+            setBroadcastingWhatsApp(true);
+            try {
+              const targetUrl = playStoreUrl.trim() || DEFAULT_PLAY_STORE_URL;
+              const finalMsg = whatsappMessage
+                .replace(/{{version}}/g, latestAppVersion.trim())
+                .replace(/{{playStoreUrl}}/g, targetUrl)
+                .replace(/{{apkUrl}}/g, apkDownloadUrl.trim() ? `🔗 Direct APK Download Link:\n${apkDownloadUrl.trim()}\n` : '');
+
+              const { data, error } = await supabase.functions.invoke('send-communication', {
+                body: {
+                  type: 'whatsapp',
+                  recipient_mode: 'all',
+                  subject: `🚀 Sabon Update v${latestAppVersion.trim()} Ya Fito!`,
+                  body: finalMsg,
+                  version: latestAppVersion.trim(),
+                  playStoreUrl: targetUrl,
+                  apkUrl: apkDownloadUrl.trim(),
+                  priority: 'high'
+                }
+              });
+
+              if (error || data?.success === false) {
+                throw new Error(data?.message || error?.message || 'Failed to broadcast WhatsApp');
+              }
+
+              Alert.alert(
+                'WhatsApp Broadcast Successful 🎉',
+                `Official release announcement dispatched via WhatsApp! Processed for ${data?.sent || totalWhatsAppUsers || 'all'} registered users.`
+              );
+            } catch (err: any) {
+              Alert.alert('Broadcast Error ❌', err.message || 'Failed to dispatch WhatsApp broadcast.');
+            } finally {
+              setBroadcastingWhatsApp(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleSaveAndBroadcast = async () => {
@@ -421,13 +546,42 @@ export default function AdminAppUpdate() {
           'security'
         );
 
-        notificationStats = `\n\nPush notification dispatched to ${broadcastCount || userProfiles?.length || 0} registered devices. Tapping it opens Google Play directly.`;
+        notificationStats += `\n\n🔔 Push notification dispatched to ${broadcastCount || userProfiles?.length || 0} registered devices.`;
+      }
+
+      // 3. Broadcast to All Users on WhatsApp if enabled
+      if (broadcastWhatsApp) {
+        try {
+          const targetUrl = playStoreUrl.trim() || DEFAULT_PLAY_STORE_URL;
+          const finalMsg = whatsappMessage
+            .replace(/{{version}}/g, latestAppVersion.trim())
+            .replace(/{{playStoreUrl}}/g, targetUrl)
+            .replace(/{{apkUrl}}/g, apkDownloadUrl.trim() ? `🔗 Direct APK Download Link:\n${apkDownloadUrl.trim()}\n` : '');
+
+          const { data: waData } = await supabase.functions.invoke('send-communication', {
+            body: {
+              type: 'whatsapp',
+              recipient_mode: 'all',
+              subject: `🚀 Sabon Update v${latestAppVersion.trim()} Ya Fito!`,
+              body: finalMsg,
+              version: latestAppVersion.trim(),
+              playStoreUrl: targetUrl,
+              apkUrl: apkDownloadUrl.trim(),
+              priority: 'high'
+            }
+          });
+
+          const waSentCount = waData?.sent || totalWhatsAppUsers || 'all';
+          notificationStats += `\n\n💬 WhatsApp broadcast dispatched to ${waSentCount} registered user numbers!`;
+        } catch (waErr) {
+          console.warn('[AdminAppUpdate] WhatsApp broadcast note:', waErr);
+        }
       }
 
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
-        'Settings Saved 🚀',
+        'Release Published Successfully 🚀',
         `Release configuration for v${latestAppVersion} has been saved successfully.${notificationStats}`
       );
     } catch (err: any) {
@@ -759,6 +913,96 @@ export default function AdminAppUpdate() {
           )}
         </View>
 
+        {/* Section 5: WhatsApp User Broadcast Engine */}
+        <View style={s.sectionCard}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
+            <Text style={[s.sectionTitle, { color: '#16A34A' }]}>5. WhatsApp Broadcast to All Users</Text>
+          </View>
+
+          <View style={s.toggleRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={s.toggleTitle}>Broadcast to WhatsApp on Save</Text>
+              <Text style={s.toggleSub}>
+                Automatically dispatches this release announcement via WhatsApp to all registered user accounts.
+              </Text>
+            </View>
+            <Switch
+              value={broadcastWhatsApp}
+              onValueChange={setBroadcastWhatsApp}
+              trackColor={{ true: '#16A34A', false: '#CBD5E1' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {/* User count badge */}
+          <View style={s.whatsappCounterPill}>
+            <Ionicons name="people" size={15} color="#16A34A" />
+            <Text style={s.whatsappCounterText}>
+              {totalWhatsAppUsers > 0
+                ? `${totalWhatsAppUsers} registered users will receive this WhatsApp announcement`
+                : 'All registered phone & WhatsApp numbers will receive this update'}
+            </Text>
+          </View>
+
+          {broadcastWhatsApp && (
+            <>
+              <View style={s.inputGroup}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={s.label}>WhatsApp Message Template</Text>
+                  <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '700' }}>Supports *bold*, links & tags</Text>
+                </View>
+                <TextInput
+                  value={whatsappMessage}
+                  onChangeText={setWhatsappMessage}
+                  style={[s.input, s.textArea, { minHeight: 140, fontSize: 12.5, lineHeight: 18 }]}
+                  multiline
+                  numberOfLines={7}
+                  textAlignVertical="top"
+                  placeholder="Enter WhatsApp announcement template..."
+                  placeholderTextColor={C.muted}
+                />
+              </View>
+
+              <View style={s.tagInfoBox}>
+                <Text style={s.tagInfoTitle}>Available Dynamic Tags:</Text>
+                <Text style={s.tagInfoText}>
+                  • <Text style={{ fontWeight: '800' }}>{`{{version}}`}</Text> &rarr; Latest version ({latestAppVersion})
+                  {'\n'}• <Text style={{ fontWeight: '800' }}>{`{{playStoreUrl}}`}</Text> &rarr; Google Play Store link
+                  {'\n'}• <Text style={{ fontWeight: '800' }}>{`{{apkUrl}}`}</Text> &rarr; Direct APK download link (if uploaded)
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={[s.testPushBtn, { flex: 1, backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]}
+                  onPress={handleTestWhatsAppAdmin}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="logo-whatsapp" size={16} color="#16A34A" style={{ marginRight: 6 }} />
+                  <Text style={[s.testPushText, { color: '#16A34A' }]}>Test to Admin Line</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.testPushBtn, { flex: 1, backgroundColor: '#070D1E', borderColor: '#1E293B' }]}
+                  onPress={handleInstantBroadcastWhatsApp}
+                  disabled={broadcastingWhatsApp}
+                  activeOpacity={0.8}
+                >
+                  {broadcastingWhatsApp ? (
+                    <ActivityIndicator size="small" color="#D97706" />
+                  ) : (
+                    <>
+                      <Ionicons name="megaphone" size={15} color="#D97706" style={{ marginRight: 6 }} />
+                      <Text style={[s.testPushText, { color: '#FFFFFF' }]}>Broadcast to All Now</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+
         {/* Primary Action Button: Save & Broadcast */}
         <TouchableOpacity
           style={s.saveButton}
@@ -778,7 +1022,13 @@ export default function AdminAppUpdate() {
               <>
                 <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={s.saveText}>
-                  {broadcastPush ? 'Save & Broadcast Push Notification' : 'Save Update Settings'}
+                  {broadcastWhatsApp && broadcastPush
+                    ? 'Save & Broadcast via WhatsApp & Push'
+                    : broadcastWhatsApp
+                    ? 'Save & Broadcast via WhatsApp'
+                    : broadcastPush
+                    ? 'Save & Broadcast Push Notification'
+                    : 'Save Update Settings'}
                 </Text>
               </>
             )}
@@ -1108,6 +1358,43 @@ const s = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: C.cyan,
+  },
+  whatsappCounterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    gap: 8,
+    marginVertical: 10,
+  },
+  whatsappCounterText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#15803D',
+    flex: 1,
+  },
+  tagInfoBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  tagInfoTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  tagInfoText: {
+    fontSize: 10.5,
+    color: '#64748B',
+    lineHeight: 16,
   },
   saveButton: {
     borderRadius: 14,

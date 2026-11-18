@@ -77,6 +77,7 @@ export default function AdminSettings() {
     const [forceAppUpdate, setForceAppUpdate] = useState(false);
     const [minAppVersion, setMinAppVersion] = useState('1.0.4');
     const [latestAppVersion, setLatestAppVersion] = useState('1.0.4');
+    const [broadcastWhatsAppOnUpdate, setBroadcastWhatsAppOnUpdate] = useState(true);
     const [playStoreUrl, setPlayStoreUrl] = useState('https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
     const [appStoreUrl, setAppStoreUrl] = useState('https://apps.apple.com/app/abu-mafhal-sub');
     const [appStoreStatus, setAppStoreStatus] = useState<'coming_soon' | 'live'>('coming_soon');
@@ -236,6 +237,7 @@ export default function AdminSettings() {
                     if (s.key === 'force_app_update') setForceAppUpdate(s.value === 'true');
                     if (s.key === 'min_app_version') setMinAppVersion(s.value || '1.0.4');
                     if (s.key === 'latest_app_version') setLatestAppVersion(s.value || '1.0.4');
+                    if (s.key === 'broadcast_whatsapp_on_update') setBroadcastWhatsAppOnUpdate(s.value !== 'false');
                     if (s.key === 'play_store_url') setPlayStoreUrl(s.value || 'https://play.google.com/store/apps/details?id=com.muhammmadsaniishaq.abumafhalsub');
                     if (s.key === 'app_store_url') setAppStoreUrl(s.value || 'https://apps.apple.com/app/abu-mafhal-sub');
                     if (s.key === 'app_store_status') setAppStoreStatus(s.value === 'live' ? 'live' : 'coming_soon');
@@ -427,6 +429,7 @@ export default function AdminSettings() {
                 { key: 'force_app_update', value: String(forceAppUpdate) },
                 { key: 'min_app_version', value: minAppVersion },
                 { key: 'latest_app_version', value: latestAppVersion },
+                { key: 'broadcast_whatsapp_on_update', value: String(broadcastWhatsAppOnUpdate) },
                 { key: 'play_store_url', value: playStoreUrl },
                 { key: 'app_store_url', value: appStoreUrl },
                 { key: 'app_store_status', value: appStoreStatus },
@@ -516,9 +519,30 @@ export default function AdminSettings() {
                 );
                 await Promise.allSettled(flagUpdates);
             } catch (_) {}
+
+            // Automatic WhatsApp release broadcast to all users
+            if (broadcastWhatsAppOnUpdate && latestAppVersion) {
+                try {
+                    const waBody = `🚀 *SABON APPLICATION VERSION YA FITO! (NEW UPDATE ALERT)*\n\nSanarwa ga dukkan abokan huldar *ABU MAFHAL SUB*:\n\nAn fitar da sabon Application Update: *v${latestAppVersion}*!\n\n${appUpdateMessage ? `🌟 *Bayani:* ${appUpdateMessage}\n\n` : ''}📥 *Danna nan domin sabuntawa kai tsaye (Download / Update Now):*\n🔗 Google Play Store:\n${playStoreUrl}\n\nKu gaggauta sabunta manhajarku domin cin gajiyar sabbin tsare-tsare masu inganci da sauri.\n\nNagode da kasancewa tare da *ABU MAFHAL SUB*! 🛡️⚡`;
+                    supabase.functions.invoke('send-communication', {
+                        body: {
+                            type: 'whatsapp',
+                            recipient_mode: 'all',
+                            subject: `🚀 Sabon Update v${latestAppVersion} Ya Fito!`,
+                            body: waBody,
+                            version: latestAppVersion,
+                            playStoreUrl: playStoreUrl,
+                            priority: 'high'
+                        }
+                    }).catch(() => {});
+                } catch (_) {}
+            }
             
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Success', 'System preferences saved and synced across all devices.');
+            Alert.alert(
+                'Success', 
+                `System preferences saved and synced across all devices.${broadcastWhatsAppOnUpdate ? ' WhatsApp announcement queued for all users.' : ''}`
+            );
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {
@@ -725,6 +749,14 @@ export default function AdminSettings() {
                                 onChangeText={setAppUpdateMessage} 
                                 placeholder="Bayani game da sabon update..." 
                                 multiline 
+                            />
+                            <ToggleRow 
+                                title="Broadcast New Versions on WhatsApp" 
+                                subtitle="Automatically dispatch release announcement to all users on WhatsApp when new version is saved"
+                                icon="logo-whatsapp" 
+                                color="#16A34A" 
+                                value={broadcastWhatsAppOnUpdate} 
+                                onValueChange={setBroadcastWhatsAppOnUpdate}
                             />
                             <View style={s.divider} />
                             <ToggleRow 
