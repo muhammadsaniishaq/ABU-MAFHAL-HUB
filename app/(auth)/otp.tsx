@@ -31,6 +31,7 @@ export default function OTP() {
         phone?: string;
         mode?: string;
         type?: string;
+        name?: string;
         factorId?: string;
         forceResend?: string;
         tempFullName?: string;
