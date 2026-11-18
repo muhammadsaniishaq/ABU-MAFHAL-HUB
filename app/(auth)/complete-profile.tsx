@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,16 +11,14 @@ import {
     ActivityIndicator,
     StyleSheet,
     Modal,
-    Linking,
     Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
 import { supabase, forceSignOut } from '../../services/supabase';
 
 const NIGERIAN_STATES = [
@@ -39,6 +37,9 @@ function validateNigerianPhone(phone: string): { isValid: boolean; formatted: st
     if (cleaned.length === 10 && !cleaned.startsWith('0')) {
         return { isValid: true, formatted: '0' + cleaned };
     }
+    if (cleaned.startsWith('234') && cleaned.length === 13) {
+        return { isValid: true, formatted: '0' + cleaned.slice(3) };
+    }
     return { isValid: false, formatted: cleaned, error: 'Please enter a valid 11-digit phone number (e.g. 08012345678).' };
 }
 
@@ -56,32 +57,13 @@ export default function CompleteProfileScreen() {
     const [showStateModal, setShowStateModal] = useState<boolean>(false);
     const [stateSearch, setStateSearch] = useState<string>('');
 
-    // Initial Loading & Action states
+    // Loading & Action states
     const [initialLoading, setInitialLoading] = useState<boolean>(true);
     const [submitting, setSubmitting] = useState<boolean>(false);
-
-    // OTP Verification Modal State
-    const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
-    const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
-    const [otpCode, setOtpCode] = useState<string[]>(new Array(6).fill(''));
-    const [otpLoading, setOtpLoading] = useState<boolean>(false);
-    const [otpCountdown, setOtpCountdown] = useState<number>(60);
-    const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
-    const otpInputRefs = useRef<Array<TextInput | null>>([]);
 
     useEffect(() => {
         loadUserProfile();
     }, []);
-
-    useEffect(() => {
-        let timer: any;
-        if (showOtpModal && otpCountdown > 0) {
-            timer = setInterval(() => setOtpCountdown(c => c - 1), 1000);
-        }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [showOtpModal, otpCountdown]);
 
     const loadUserProfile = async () => {
         try {
@@ -112,12 +94,13 @@ export default function CompleteProfileScreen() {
                     setUsername(fallbackUser);
                 }
 
-                if (profile.phone) setPhone(profile.phone);
-                if (profile.whatsapp_number) {
+                if (profile.phone) {
+                    setPhone(profile.phone);
+                    setWhatsappNumber(profile.whatsapp_number || profile.phone);
+                }
+                if (profile.whatsapp_number && profile.phone && profile.whatsapp_number !== profile.phone) {
+                    setSameAsPhone(false);
                     setWhatsappNumber(profile.whatsapp_number);
-                    if (profile.phone && profile.phone !== profile.whatsapp_number) {
-                        setSameAsPhone(false);
-                    }
                 }
                 if (profile.state) setSelectedState(profile.state);
             }
@@ -148,147 +131,118 @@ export default function CompleteProfileScreen() {
         }
     };
 
-    // Trigger OTP sending
-    const handleSendOtp = async (channel: 'whatsapp' | 'sms') => {
-        // Validate inputs
-        if (!fullName.trim() || fullName.trim().length < 3) {
-            Alert.alert('Full Name Required', 'Please enter your genuine full name.');
+    // Save Profile with Strict Database Duplicate Checks
+    const handleSaveProfile = async () => {
+        if (!userId) {
+            Alert.alert('Session Error', 'Please log in again.');
+            router.replace('/(auth)/login' as any);
             return;
         }
 
+        // 1. Full Name Validation
+        if (!fullName.trim() || fullName.trim().length < 3) {
+            Alert.alert('Full Name Required', 'Please enter your genuine full name (min 3 characters).');
+            return;
+        }
+
+        // 2. Username Validation
         const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
         if (!cleanUsername || cleanUsername.length < 3) {
-            Alert.alert('Username Required', 'Please enter a valid username (min 3 alphanumeric characters).');
+            Alert.alert('Username Required', 'Please choose a valid username (min 3 characters, letters and numbers only).');
             return;
         }
 
+        // 3. Phone Number Format Validation
         const phoneVal = validateNigerianPhone(phone);
         if (!phoneVal.isValid) {
-            Alert.alert('Invalid Phone', phoneVal.error || 'Please enter a valid 11-digit Nigerian phone number.');
+            Alert.alert('Invalid Phone Number', phoneVal.error || 'Please enter an 11-digit Nigerian phone number.');
             return;
         }
 
-        const effectiveWhatsapp = sameAsPhone ? phoneVal.formatted : whatsappNumber;
-        const waVal = validateNigerianPhone(effectiveWhatsapp);
-        if (!waVal.isValid) {
-            Alert.alert('Invalid WhatsApp Number', 'Please enter a valid 11-digit WhatsApp phone number.');
-            return;
+        const effectiveWhatsapp = sameAsPhone ? phoneVal.formatted : whatsappNumber.trim();
+        if (!sameAsPhone && effectiveWhatsapp) {
+            const waVal = validateNigerianPhone(effectiveWhatsapp);
+            if (!waVal.isValid) {
+                Alert.alert('Invalid WhatsApp Number', 'Please enter a valid 11-digit WhatsApp phone number.');
+                return;
+            }
         }
-
-        const targetIdentifier = channel === 'whatsapp' ? waVal.formatted : phoneVal.formatted;
 
         setSubmitting(true);
         try {
-            const { data, error } = await supabase.functions.invoke('send-otp', {
-                body: {
-                    action: 'send',
-                    identifier: targetIdentifier,
-                    channel: channel,
-                    purpose: 'profile_completion',
-                    userId: userId,
-                    name: fullName.trim(),
+            // 🛡️ 4. DATABASE CHECK: PREVENT DUPLICATE PHONE NUMBERS (Strict anti-double check)
+            const cleanDigits10 = phoneVal.formatted.slice(-10);
+            const { data: duplicatePhoneUsers, error: phoneCheckErr } = await supabase
+                .from('profiles')
+                .select('id, full_name, phone')
+                .ilike('phone', `%${cleanDigits10}`)
+                .neq('id', userId)
+                .limit(1);
+
+            if (phoneCheckErr) {
+                console.warn('Phone uniqueness pre-check notice:', phoneCheckErr);
+            }
+
+            if (duplicatePhoneUsers && duplicatePhoneUsers.length > 0) {
+                Alert.alert(
+                    'Phone Number Already Registered 🔒',
+                    'This phone number is already registered to another account in our system. Duplicate phone numbers are strictly prohibited. Please provide your personal phone number.'
+                );
+                setSubmitting(false);
+                return;
+            }
+
+            // Also check WhatsApp number uniqueness if entered separately
+            if (!sameAsPhone && effectiveWhatsapp) {
+                const waDigits10 = effectiveWhatsapp.slice(-10);
+                const { data: duplicateWaUsers } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, phone')
+                    .or(`phone.ilike.%${waDigits10},whatsapp_number.ilike.%${waDigits10}`)
+                    .neq('id', userId)
+                    .limit(1);
+
+                if (duplicateWaUsers && duplicateWaUsers.length > 0) {
+                    Alert.alert(
+                        'WhatsApp Number In Use 🔒',
+                        'This WhatsApp number is already linked to another account. Please use your unique personal number.'
+                    );
+                    setSubmitting(false);
+                    return;
                 }
-            });
-
-            if (error || data?.success === false) {
-                throw new Error(data?.message || error?.message || 'Failed to dispatch verification code.');
             }
 
-            if (data?.whatsapp_url) {
-                setWhatsappUrl(data.whatsapp_url);
-            } else {
-                setWhatsappUrl(`https://wa.me/2349065645747?text=VERIFY`);
+            // 🛡️ 5. DATABASE CHECK: PREVENT DUPLICATE USERNAME
+            const { data: duplicateUsernames, error: usernameCheckErr } = await supabase
+                .from('profiles')
+                .select('id, username')
+                .ilike('username', cleanUsername)
+                .neq('id', userId)
+                .limit(1);
+
+            if (usernameCheckErr) {
+                console.warn('Username uniqueness pre-check notice:', usernameCheckErr);
             }
 
-            setOtpChannel(channel);
-            setOtpCode(new Array(6).fill(''));
-            setOtpCountdown(60);
-            setShowOtpModal(true);
-
-            if (Platform.OS !== 'web') {
-                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
-            }
-        } catch (err: any) {
-            Alert.alert('Delivery Notice', err.message || 'Unable to send OTP at this time. Please try another channel.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    // OTP Inputs handling
-    const handleOtpDigitChange = (val: string, index: number) => {
-        const cleanDigits = val.replace(/\D/g, '');
-        if (cleanDigits.length >= 6) {
-            const split = cleanDigits.slice(0, 6).split('');
-            setOtpCode(split);
-            handleVerifyOtp(cleanDigits.slice(0, 6));
-            return;
-        }
-
-        const char = cleanDigits.slice(-1);
-        const next = [...otpCode];
-        next[index] = char;
-        setOtpCode(next);
-
-        if (char && index < 5) {
-            otpInputRefs.current[index + 1]?.focus();
-        }
-
-        if (next.every(d => d !== '') && next.join('').length === 6) {
-            handleVerifyOtp(next.join(''));
-        }
-    };
-
-    const handleOtpKeyPress = (e: any, index: number) => {
-        if (e.nativeEvent.key === 'Backspace' && !otpCode[index] && index > 0) {
-            otpInputRefs.current[index - 1]?.focus();
-        }
-    };
-
-    const handlePasteOtp = async () => {
-        try {
-            const clip = await Clipboard.getStringAsync();
-            const cleaned = (clip || '').replace(/\D/g, '').slice(0, 6);
-            if (cleaned.length === 6) {
-                setOtpCode(cleaned.split(''));
-                handleVerifyOtp(cleaned);
-            } else {
-                Alert.alert('Clipboard Empty', 'No 6-digit verification code found in clipboard.');
-            }
-        } catch (_) {}
-    };
-
-    const handleVerifyOtp = async (codeToVerify: string) => {
-        if (!codeToVerify || codeToVerify.length !== 6 || otpLoading) return;
-
-        setOtpLoading(true);
-        const effectiveWhatsapp = sameAsPhone ? phone : whatsappNumber;
-        const targetIdentifier = otpChannel === 'whatsapp' ? effectiveWhatsapp : phone;
-
-        try {
-            const { data, error } = await supabase.functions.invoke('send-otp', {
-                body: {
-                    action: 'verify',
-                    identifier: targetIdentifier,
-                    code: codeToVerify,
-                    purpose: 'profile_completion',
-                    userId: userId,
-                }
-            });
-
-            if (error || data?.success === false) {
-                throw new Error(data?.message || error?.message || 'Invalid or expired OTP code.');
+            if (duplicateUsernames && duplicateUsernames.length > 0) {
+                Alert.alert(
+                    'Username Already Taken 🔒',
+                    'This username is already taken by another user. Please choose a different username.'
+                );
+                setSubmitting(false);
+                return;
             }
 
-            // Save completed profile details to Supabase profiles
+            // 6. Direct Database Update (Profiles)
             const updatePayload: Record<string, any> = {
                 full_name: fullName.trim(),
-                username: username.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''),
-                phone: phone.trim(),
-                whatsapp_number: effectiveWhatsapp.trim(),
+                username: cleanUsername,
+                phone: phoneVal.formatted,
+                whatsapp_number: effectiveWhatsapp || phoneVal.formatted,
                 state: selectedState,
                 phone_verified: true,
                 whatsapp_verified: true,
+                status: 'active',
                 updated_at: new Date().toISOString()
             };
 
@@ -298,28 +252,26 @@ export default function CompleteProfileScreen() {
                 .eq('id', userId);
 
             if (profileUpdateError) {
-                console.warn('Profile update notice:', profileUpdateError);
+                throw new Error(profileUpdateError.message || 'Failed to update profile record.');
             }
 
-            // Trigger background virtual account creation
+            // 7. Background Auto Virtual Account Generation
             try {
                 supabase.functions.invoke('create-virtual-account', {
                     body: { userId: userId }
                 }).catch(() => {});
             } catch (_) {}
 
-            setShowOtpModal(false);
-
             if (Platform.OS !== 'web') {
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (_) {}
             }
 
-            const successMsg = 'Profile verified & completed successfully! Please set your 4-digit transaction PIN to secure your wallet.';
+            const successNotice = 'Profile details saved successfully! Please set your 4-digit transaction PIN to secure your wallet.';
             if (Platform.OS === 'web') {
-                alert(successMsg);
+                alert(successNotice);
                 router.replace('/(auth)/pin-setup' as any);
             } else {
-                Alert.alert('Verified! 🎉', successMsg, [
+                Alert.alert('Profile Complete 🎉', successNotice, [
                     {
                         text: 'Set Transaction PIN',
                         onPress: () => router.replace('/(auth)/pin-setup' as any)
@@ -327,9 +279,9 @@ export default function CompleteProfileScreen() {
                 ]);
             }
         } catch (err: any) {
-            Alert.alert('Verification Failed ❌', err.message || 'Incorrect verification code. Please try again.');
+            Alert.alert('Update Failed ❌', err.message || 'Unable to update profile. Please try again.');
         } finally {
-            setOtpLoading(false);
+            setSubmitting(false);
         }
     };
 
@@ -353,17 +305,7 @@ export default function CompleteProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar style="light" />
-
-            {/* Subtle Executive Gradient Mesh Background */}
-            <LinearGradient
-                colors={['#060B1E', '#0A192F', '#0D1B2A']}
-                style={StyleSheet.absoluteFillObject}
-            />
-
-            {/* Glowing Accent Orbs */}
-            <View style={styles.topAuraGold} />
-            <View style={styles.topAuraEmerald} />
+            <StatusBar style="dark" />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -377,38 +319,38 @@ export default function CompleteProfileScreen() {
                     {/* Top Security Step Badge */}
                     <View style={styles.stepBadgeRow}>
                         <View style={styles.stepBadge}>
-                            <Ionicons name="shield-checkmark" size={12} color="#D4AF37" />
+                            <Ionicons name="shield-checkmark" size={13} color="#B45309" />
                             <Text style={styles.stepBadgeText}>STEP 2 OF 2 • SECURE ONBOARDING</Text>
                         </View>
                     </View>
 
-                    {/* Compact Modern Header */}
+                    {/* Executive Modern Light Header */}
                     <View style={styles.header}>
                         <LinearGradient
-                            colors={['#D4AF37', '#AA7C11']}
+                            colors={['#0A1128', '#111D3B']}
                             style={styles.logoBadge}
                         >
-                            <FontAwesome5 name="user-check" size={20} color="#060B1E" />
+                            <FontAwesome5 name="user-check" size={18} color="#D4AF37" />
                         </LinearGradient>
                         <Text style={styles.title}>Complete Your Profile</Text>
                         <Text style={styles.subtitle}>
-                            Link your verified phone number & WhatsApp to unlock automated VTU services, instant wallet funding, and 24/7 alerts.
+                            Provide your genuine contact information to activate automated VTU services, virtual accounts, and 24/7 transaction alerts.
                         </Text>
                     </View>
 
-                    {/* Compact Form Card */}
+                    {/* Clean White Card */}
                     <View style={styles.card}>
-                        {/* Email (Read Only - Compact Pill) */}
+                        {/* Email (Read Only - Authenticated) */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.microLabel}>AUTHENTICATED EMAIL</Text>
                             <View style={[styles.inputBox, styles.readOnlyBox]}>
-                                <Ionicons name="mail" size={15} color="#64748B" style={styles.inputIcon} />
+                                <Ionicons name="mail" size={16} color="#64748B" style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, styles.readOnlyText]}
                                     value={userEmail}
                                     editable={false}
                                 />
-                                <Ionicons name="lock-closed" size={14} color="#64748B" />
+                                <Ionicons name="lock-closed" size={15} color="#94A3B8" />
                             </View>
                         </View>
 
@@ -418,11 +360,11 @@ export default function CompleteProfileScreen() {
                                 FULL NAME <Text style={styles.required}>*</Text>
                             </Text>
                             <View style={styles.inputBox}>
-                                <Ionicons name="person-outline" size={16} color="#D4AF37" style={styles.inputIcon} />
+                                <Ionicons name="person-outline" size={17} color="#D4AF37" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="e.g. Muhammad Sani"
-                                    placeholderTextColor="#475569"
+                                    placeholder="e.g. Muhammad Sani Isyaku"
+                                    placeholderTextColor="#94A3B8"
                                     value={fullName}
                                     onChangeText={setFullName}
                                     autoCapitalize="words"
@@ -433,14 +375,14 @@ export default function CompleteProfileScreen() {
                         {/* Username */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.microLabel}>
-                                CHOOSE USERNAME <Text style={styles.required}>*</Text>
+                                UNIQUE USERNAME <Text style={styles.required}>*</Text>
                             </Text>
                             <View style={styles.inputBox}>
-                                <Ionicons name="at" size={16} color="#D4AF37" style={styles.inputIcon} />
+                                <Ionicons name="at" size={17} color="#D4AF37" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="e.g. sani_hub"
-                                    placeholderTextColor="#475569"
+                                    placeholderTextColor="#94A3B8"
                                     value={username}
                                     onChangeText={t => setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                                     autoCapitalize="none"
@@ -448,7 +390,7 @@ export default function CompleteProfileScreen() {
                             </View>
                         </View>
 
-                        {/* Phone Number with Nigeria Flag Pill */}
+                        {/* Phone Number with Nigerian Flag */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.microLabel}>
                                 PHONE NUMBER <Text style={styles.required}>*</Text>
@@ -461,31 +403,32 @@ export default function CompleteProfileScreen() {
                                 <TextInput
                                     style={styles.input}
                                     placeholder="08012345678"
-                                    placeholderTextColor="#475569"
+                                    placeholderTextColor="#94A3B8"
                                     value={phone}
                                     onChangeText={handlePhoneChange}
                                     keyboardType="phone-pad"
                                     maxLength={11}
                                 />
                             </View>
+                            <Text style={styles.helperText}>Each account must have a unique personal phone number.</Text>
                         </View>
 
-                        {/* Modern WhatsApp Compact Switch Row */}
+                        {/* WhatsApp Number Switch */}
                         <View style={styles.switchCard}>
                             <View style={styles.switchLeft}>
                                 <View style={styles.whatsappIconCircle}>
-                                    <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                    <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
                                 </View>
-                                <View>
+                                <View style={{ flex: 1 }}>
                                     <Text style={styles.switchTitle}>Same WhatsApp Number</Text>
-                                    <Text style={styles.switchSubtitle}>Use this phone number for WhatsApp verification</Text>
+                                    <Text style={styles.switchSubtitle}>Use your phone number for official notifications</Text>
                                 </View>
                             </View>
                             <Switch
                                 value={sameAsPhone}
                                 onValueChange={toggleSameAsPhone}
-                                trackColor={{ false: '#1E293B', true: '#10B981' }}
-                                thumbColor={sameAsPhone ? '#FFFFFF' : '#94A3B8'}
+                                trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+                                thumbColor={sameAsPhone ? '#FFFFFF' : '#F1F5F9'}
                             />
                         </View>
 
@@ -497,13 +440,13 @@ export default function CompleteProfileScreen() {
                                 </Text>
                                 <View style={styles.inputBox}>
                                     <View style={styles.countryPrefix}>
-                                        <Ionicons name="logo-whatsapp" size={14} color="#25D366" style={{ marginRight: 4 }} />
+                                        <Ionicons name="logo-whatsapp" size={15} color="#16A34A" style={{ marginRight: 4 }} />
                                         <Text style={styles.countryCode}>+234</Text>
                                     </View>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="08012345678"
-                                        placeholderTextColor="#475569"
+                                        placeholderTextColor="#94A3B8"
                                         value={whatsappNumber}
                                         onChangeText={handleWhatsappChange}
                                         keyboardType="phone-pad"
@@ -525,46 +468,36 @@ export default function CompleteProfileScreen() {
                                 activeOpacity={0.8}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                    <Ionicons name="location-outline" size={16} color="#D4AF37" style={styles.inputIcon} />
+                                    <Ionicons name="location-outline" size={17} color="#D4AF37" style={styles.inputIcon} />
                                     <Text style={styles.selectText}>{selectedState}</Text>
                                 </View>
-                                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
+                                <Ionicons name="chevron-down" size={16} color="#64748B" />
                             </TouchableOpacity>
                         </View>
 
-                        {/* Instant Verification CTA Buttons */}
+                        {/* Primary Action Button (No WhatsApp OTP gating) */}
                         <View style={styles.actionContainer}>
                             <TouchableOpacity
                                 style={[styles.primaryButton, submitting && styles.disabledButton]}
-                                onPress={() => handleSendOtp('whatsapp')}
+                                onPress={handleSaveProfile}
                                 disabled={submitting}
                                 activeOpacity={0.85}
                             >
                                 <LinearGradient
-                                    colors={['#25D366', '#128C7E']}
+                                    colors={['#0A1128', '#111D3B']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                     style={styles.buttonGradient}
                                 >
-                                    {submitting && otpChannel === 'whatsapp' ? (
+                                    {submitting ? (
                                         <ActivityIndicator color="#FFFFFF" size="small" />
                                     ) : (
                                         <View style={styles.btnContentRow}>
-                                            <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                            <Text style={styles.primaryButtonText}>Verify via WhatsApp (Instant OTP)</Text>
+                                            <Text style={styles.primaryButtonText}>Complete Profile & Proceed</Text>
+                                            <Ionicons name="arrow-forward" size={17} color="#D4AF37" style={{ marginLeft: 8 }} />
                                         </View>
                                     )}
                                 </LinearGradient>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.secondaryButton}
-                                onPress={() => handleSendOtp('sms')}
-                                disabled={submitting}
-                                activeOpacity={0.85}
-                            >
-                                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#D4AF37" style={{ marginRight: 6 }} />
-                                <Text style={styles.secondaryButtonText}>Verify via SMS Code</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -579,10 +512,10 @@ export default function CompleteProfileScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Modern Searchable State Picker Modal */}
+            {/* State Picker Modal (Clean Light Theme) */}
             <Modal
                 visible={showStateModal}
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
                 onRequestClose={() => setShowStateModal(false)}
             >
@@ -594,17 +527,17 @@ export default function CompleteProfileScreen() {
                                 <Text style={styles.modalTitle}>Select State</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowStateModal(false)} style={styles.modalCloseBtn}>
-                                <Ionicons name="close" size={20} color="#CBD5E1" />
+                                <Ionicons name="close" size={20} color="#64748B" />
                             </TouchableOpacity>
                         </View>
 
                         {/* Search Bar */}
                         <View style={styles.searchBar}>
-                            <Ionicons name="search" size={15} color="#64748B" style={{ marginRight: 8 }} />
+                            <Ionicons name="search" size={16} color="#64748B" style={{ marginRight: 8 }} />
                             <TextInput
                                 style={styles.searchInput}
                                 placeholder="Search Nigerian state..."
-                                placeholderTextColor="#64748B"
+                                placeholderTextColor="#94A3B8"
                                 value={stateSearch}
                                 onChangeText={setStateSearch}
                                 autoCapitalize="none"
@@ -647,122 +580,6 @@ export default function CompleteProfileScreen() {
                     </View>
                 </View>
             </Modal>
-
-            {/* Ultra-Modern WhatsApp OTP Modal */}
-            <Modal
-                visible={showOtpModal}
-                animationType="fade"
-                transparent={true}
-                onRequestClose={() => setShowOtpModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.otpModalCard}>
-                        {/* Emblem Badge */}
-                        <View style={[
-                            styles.otpIconBadge,
-                            otpChannel === 'whatsapp' ? styles.otpIconBadgeWa : styles.otpIconBadgeSms
-                        ]}>
-                            <Ionicons
-                                name={otpChannel === 'whatsapp' ? "logo-whatsapp" : "chatbubble-ellipses"}
-                                size={26}
-                                color={otpChannel === 'whatsapp' ? "#25D366" : "#D4AF37"}
-                            />
-                        </View>
-
-                        <Text style={styles.otpTitle}>Enter 6-Digit Code</Text>
-                        <Text style={styles.otpSubtitle}>
-                            Dispatched via {otpChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'} to{' '}
-                            <Text style={styles.otpHighlight}>
-                                {otpChannel === 'whatsapp' ? (sameAsPhone ? phone : whatsappNumber) : phone}
-                            </Text>
-                        </Text>
-
-                        {/* 1-Tap Open WhatsApp Button (Instant Access) */}
-                        {otpChannel === 'whatsapp' && (
-                            <TouchableOpacity
-                                style={styles.openWhatsappPill}
-                                onPress={() => {
-                                    const target = whatsappUrl || `https://wa.me/2349065645747`;
-                                    Linking.openURL(target).catch(() => {
-                                        Alert.alert('Notice', 'Unable to launch WhatsApp on this device.');
-                                    });
-                                }}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
-                                <Text style={styles.openWhatsappText}>Open WhatsApp App 🟢</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        {/* 6 Compact OTP Boxes */}
-                        <View style={styles.otpRow}>
-                            {otpCode.map((digit, idx) => (
-                                <TextInput
-                                    key={idx}
-                                    ref={el => { otpInputRefs.current[idx] = el; }}
-                                    style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
-                                    keyboardType="number-pad"
-                                    maxLength={idx === 0 ? 6 : 1}
-                                    value={digit}
-                                    onChangeText={v => handleOtpDigitChange(v, idx)}
-                                    onKeyPress={e => handleOtpKeyPress(e, idx)}
-                                    textAlign="center"
-                                    selectionColor="#D4AF37"
-                                />
-                            ))}
-                        </View>
-
-                        {/* 1-Tap Paste & Timer Row */}
-                        <View style={styles.otpHelperRow}>
-                            <TouchableOpacity onPress={handlePasteOtp} style={styles.pasteBtn} activeOpacity={0.7}>
-                                <Ionicons name="clipboard-outline" size={14} color="#D4AF37" />
-                                <Text style={styles.pasteText}>Paste Code</Text>
-                            </TouchableOpacity>
-
-                            {otpCountdown > 0 ? (
-                                <Text style={styles.timerText}>Resend in <Text style={{ color: '#D4AF37', fontWeight: '700' }}>{otpCountdown}s</Text></Text>
-                            ) : (
-                                <TouchableOpacity onPress={() => handleSendOtp(otpChannel)}>
-                                    <Text style={styles.resendText}>Resend Code</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {/* Submit Button */}
-                        <TouchableOpacity
-                            style={[styles.verifyButton, (otpLoading || otpCode.some(d => !d)) && styles.disabledButton]}
-                            onPress={() => handleVerifyOtp(otpCode.join(''))}
-                            disabled={otpLoading || otpCode.some(d => !d)}
-                            activeOpacity={0.85}
-                        >
-                            <LinearGradient
-                                colors={['#D4AF37', '#AA7C11']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.buttonGradient}
-                            >
-                                {otpLoading ? (
-                                    <ActivityIndicator color="#060B1E" size="small" />
-                                ) : (
-                                    <View style={styles.btnContentRow}>
-                                        <Ionicons name="checkmark-done-circle" size={18} color="#060B1E" style={{ marginRight: 6 }} />
-                                        <Text style={styles.verifyButtonText}>Confirm & Continue</Text>
-                                    </View>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        {/* Change Number or Channel */}
-                        <TouchableOpacity
-                            style={styles.cancelOtpButton}
-                            onPress={() => setShowOtpModal(false)}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.cancelOtpText}>Change Number or Method</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </SafeAreaView>
     );
 }
@@ -770,64 +587,46 @@ export default function CompleteProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#060B1E',
+        backgroundColor: '#F8FAFC',
     },
     loadingContainer: {
         flex: 1,
-        backgroundColor: '#060B1E',
+        backgroundColor: '#F8FAFC',
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
         marginTop: 14,
-        color: '#94A3B8',
+        color: '#64748B',
         fontSize: 14,
-        fontWeight: '500',
-    },
-    topAuraGold: {
-        position: 'absolute',
-        top: -80,
-        right: -60,
-        width: 240,
-        height: 240,
-        borderRadius: 120,
-        backgroundColor: 'rgba(212, 175, 55, 0.08)',
-    },
-    topAuraEmerald: {
-        position: 'absolute',
-        top: -40,
-        left: -80,
-        width: 220,
-        height: 220,
-        borderRadius: 110,
-        backgroundColor: 'rgba(16, 185, 129, 0.06)',
+        fontWeight: '600',
     },
     scrollContent: {
         paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 32,
+        paddingTop: 12,
+        paddingBottom: 36,
         alignSelf: 'center',
         width: '100%',
-        maxWidth: 420,
+        maxWidth: 440,
     },
     stepBadgeRow: {
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 10,
     },
     stepBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        backgroundColor: 'rgba(212, 175, 55, 0.1)',
-        borderColor: 'rgba(212, 175, 55, 0.35)',
+        gap: 6,
+        backgroundColor: '#FEF3C7',
+        borderColor: '#FDE68A',
         borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
         borderRadius: 20,
     },
     stepBadgeText: {
-        color: '#D4AF37',
-        fontSize: 10,
+        color: '#B45309',
+        fontSize: 10.5,
         fontWeight: '800',
         letterSpacing: 0.8,
     },
@@ -836,55 +635,55 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     logoBadge: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 10,
-        elevation: 6,
-        shadowColor: '#D4AF37',
+        elevation: 4,
+        shadowColor: '#0A1128',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.15,
         shadowRadius: 6,
     },
     title: {
-        fontSize: 21,
-        fontWeight: '800',
-        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#071435',
         textAlign: 'center',
         letterSpacing: -0.3,
     },
     subtitle: {
-        fontSize: 12,
-        color: '#94A3B8',
+        fontSize: 12.5,
+        color: '#64748B',
         textAlign: 'center',
         marginTop: 5,
-        lineHeight: 17,
-        paddingHorizontal: 10,
+        lineHeight: 18,
+        paddingHorizontal: 12,
     },
     card: {
-        backgroundColor: '#0D1B2A',
+        backgroundColor: '#FFFFFF',
         borderRadius: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 18,
+        paddingHorizontal: 18,
+        paddingVertical: 20,
         borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.22)',
-        shadowColor: '#000',
+        borderColor: '#E2E8F0',
+        shadowColor: '#071435',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.04,
         shadowRadius: 10,
-        elevation: 5,
+        elevation: 3,
     },
     inputGroup: {
-        marginBottom: 12,
+        marginBottom: 14,
     },
     microLabel: {
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: '800',
-        color: '#94A3B8',
-        marginBottom: 5,
-        letterSpacing: 0.6,
+        color: '#475569',
+        marginBottom: 6,
+        letterSpacing: 0.5,
     },
     required: {
         color: '#EF4444',
@@ -892,35 +691,36 @@ const styles = StyleSheet.create({
     inputBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#060B1E',
-        borderWidth: 1,
-        borderColor: '#1E293B',
-        borderRadius: 11,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.2,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
         paddingHorizontal: 12,
-        height: 44,
+        height: 48,
     },
     readOnlyBox: {
-        backgroundColor: '#050914',
-        borderColor: '#151D2A',
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
     },
     inputIcon: {
         marginRight: 8,
     },
     input: {
         flex: 1,
-        color: '#FFFFFF',
+        color: '#071435',
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     readOnlyText: {
         color: '#64748B',
+        fontWeight: '500',
     },
     countryPrefix: {
         flexDirection: 'row',
         alignItems: 'center',
         marginRight: 8,
         borderRightWidth: 1,
-        borderRightColor: '#1E293B',
+        borderRightColor: '#E2E8F0',
         paddingRight: 8,
     },
     flag: {
@@ -928,21 +728,27 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     countryCode: {
-        color: '#D4AF37',
+        color: '#B45309',
         fontSize: 13,
-        fontWeight: '700',
+        fontWeight: '800',
+    },
+    helperText: {
+        fontSize: 10.5,
+        color: '#94A3B8',
+        marginTop: 4,
+        marginLeft: 2,
     },
     switchCard: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#060B1E',
+        backgroundColor: '#F8FAFC',
         borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#1E293B',
+        borderWidth: 1.2,
+        borderColor: '#E2E8F0',
         paddingHorizontal: 12,
         paddingVertical: 10,
-        marginBottom: 12,
+        marginBottom: 14,
     },
     switchLeft: {
         flexDirection: 'row',
@@ -952,16 +758,16 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     whatsappIconCircle: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(37, 211, 102, 0.12)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#DCFCE7',
         alignItems: 'center',
         justifyContent: 'center',
     },
     switchTitle: {
-        color: '#FFFFFF',
-        fontSize: 12.5,
+        color: '#071435',
+        fontSize: 13,
         fontWeight: '700',
     },
     switchSubtitle: {
@@ -973,28 +779,28 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     selectText: {
-        color: '#FFFFFF',
+        color: '#071435',
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     actionContainer: {
-        marginTop: 6,
+        marginTop: 10,
+        marginBottom: 12,
     },
     primaryButton: {
         borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 10,
-        elevation: 4,
-        shadowColor: '#25D366',
+        elevation: 3,
+        shadowColor: '#071435',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.15,
         shadowRadius: 6,
     },
     buttonGradient: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        height: 46,
+        height: 48,
     },
     btnContentRow: {
         flexDirection: 'row',
@@ -1003,54 +809,43 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         color: '#FFFFFF',
-        fontSize: 13.5,
+        fontSize: 14,
         fontWeight: '800',
         letterSpacing: 0.3,
     },
-    secondaryButton: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: 42,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.6)',
-        backgroundColor: 'rgba(212, 175, 55, 0.06)',
-        marginBottom: 12,
-    },
-    secondaryButtonText: {
-        color: '#D4AF37',
-        fontSize: 13,
-        fontWeight: '700',
-    },
     logoutButton: {
         alignItems: 'center',
-        paddingVertical: 6,
+        paddingVertical: 8,
     },
     logoutText: {
         color: '#64748B',
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 12.5,
+        fontWeight: '600',
         textDecorationLine: 'underline',
     },
     disabledButton: {
-        opacity: 0.55,
+        opacity: 0.6,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: 'rgba(7, 20, 53, 0.65)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
     },
     stateModalContent: {
-        backgroundColor: '#0D1B2A',
+        backgroundColor: '#FFFFFF',
         borderRadius: 20,
-        padding: 16,
+        padding: 18,
         width: '100%',
         maxWidth: 380,
         borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.3)',
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 8,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1059,12 +854,12 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
+        borderBottomColor: '#F1F5F9',
     },
     modalTitle: {
         fontSize: 16,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: '#071435',
     },
     modalCloseBtn: {
         padding: 4,
@@ -1072,18 +867,19 @@ const styles = StyleSheet.create({
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#060B1E',
+        backgroundColor: '#F8FAFC',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: '#CBD5E1',
         paddingHorizontal: 10,
-        height: 38,
+        height: 40,
         marginBottom: 10,
     },
     searchInput: {
         flex: 1,
-        color: '#FFFFFF',
+        color: '#071435',
         fontSize: 13,
+        fontWeight: '600',
     },
     stateItem: {
         flexDirection: 'row',
@@ -1095,149 +891,15 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     selectedStateItem: {
-        backgroundColor: 'rgba(212, 175, 55, 0.12)',
+        backgroundColor: '#FEF3C7',
     },
     stateItemText: {
-        color: '#CBD5E1',
+        color: '#334155',
         fontSize: 13.5,
+        fontWeight: '500',
     },
     selectedStateItemText: {
-        color: '#D4AF37',
-        fontWeight: '700',
-    },
-    otpModalCard: {
-        backgroundColor: '#0D1B2A',
-        borderRadius: 22,
-        padding: 20,
-        width: '100%',
-        maxWidth: 360,
-        borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.35)',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 8,
-    },
-    otpIconBadge: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    otpIconBadgeWa: {
-        backgroundColor: 'rgba(37, 211, 102, 0.12)',
-        borderColor: 'rgba(37, 211, 102, 0.3)',
-        borderWidth: 1,
-    },
-    otpIconBadgeSms: {
-        backgroundColor: 'rgba(212, 175, 55, 0.12)',
-        borderColor: 'rgba(212, 175, 55, 0.3)',
-        borderWidth: 1,
-    },
-    otpTitle: {
-        fontSize: 18,
+        color: '#B45309',
         fontWeight: '800',
-        color: '#FFFFFF',
-    },
-    otpSubtitle: {
-        fontSize: 11.5,
-        color: '#94A3B8',
-        textAlign: 'center',
-        marginTop: 4,
-        lineHeight: 16,
-        paddingHorizontal: 8,
-    },
-    otpHighlight: {
-        color: '#D4AF37',
-        fontWeight: '700',
-    },
-    openWhatsappPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(37, 211, 102, 0.12)',
-        borderColor: 'rgba(37, 211, 102, 0.35)',
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        marginTop: 10,
-        marginBottom: 12,
-    },
-    openWhatsappText: {
-        color: '#25D366',
-        fontSize: 11.5,
-        fontWeight: '700',
-    },
-    otpRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 6,
-        marginVertical: 12,
-    },
-    otpBox: {
-        width: 42,
-        height: 48,
-        borderRadius: 10,
-        backgroundColor: '#060B1E',
-        borderWidth: 1.5,
-        borderColor: '#1E293B',
-        color: '#FFFFFF',
-        fontSize: 20,
-        fontWeight: '800',
-    },
-    otpBoxFilled: {
-        borderColor: '#D4AF37',
-        backgroundColor: '#15243B',
-    },
-    otpHelperRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        marginBottom: 16,
-        paddingHorizontal: 4,
-    },
-    pasteBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    pasteText: {
-        color: '#D4AF37',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    timerText: {
-        color: '#64748B',
-        fontSize: 11.5,
-    },
-    resendText: {
-        color: '#25D366',
-        fontSize: 12,
-        fontWeight: '800',
-    },
-    verifyButton: {
-        width: '100%',
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginBottom: 10,
-    },
-    verifyButtonText: {
-        color: '#060B1E',
-        fontSize: 14,
-        fontWeight: '800',
-    },
-    cancelOtpButton: {
-        paddingVertical: 6,
-    },
-    cancelOtpText: {
-        color: '#64748B',
-        fontSize: 11.5,
-        fontWeight: '500',
     },
 });
