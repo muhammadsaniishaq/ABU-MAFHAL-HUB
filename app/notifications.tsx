@@ -18,15 +18,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getGlobalNotificationTune, playDeviceAlertSound } from '../hooks/usePushNotifications';
 
 export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
+    const [activeTune, setActiveTune] = useState<{ id: string; name: string; uri: string } | null>(null);
+    const [isPlayingTune, setIsPlayingTune] = useState(false);
     const [sortAsc, setSortAsc] = useState(false);
     const [filter, setFilter] = useState<'all' | 'unread' | 'transaction' | 'security' | 'promo'>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -44,8 +48,32 @@ export default function NotificationsScreen() {
     useEffect(() => {
         fetchNotifications();
         const subscribe = subscribeToNotifications();
+
+        AsyncStorage.getItem('user_notifications_muted').then((val) => {
+            setIsMuted(val === 'true');
+        });
+
+        getGlobalNotificationTune().then((tune) => {
+            if (tune) setActiveTune(tune);
+        });
+
+        // Listen for realtime tune changes
+        const tuneSub = supabase
+            .channel('user-screen-tune-sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.global_notification_ringtone' },
+                () => {
+                    getGlobalNotificationTune().then((tune) => {
+                        if (tune) setActiveTune(tune);
+                    });
+                }
+            )
+            .subscribe();
+
         return () => {
             subscribe();
+            supabase.removeChannel(tuneSub);
         };
     }, []);
 
@@ -491,6 +519,56 @@ export default function NotificationsScreen() {
 
             {/* Light Body Section */}
             <View style={s.bodyContainer}>
+                {/* Global Notification Sound Bar */}
+                <View style={s.soundControlBar}>
+                    <View style={s.soundInfoCol}>
+                        <View style={s.soundLabelRow}>
+                            <Ionicons name="musical-notes" size={13} color="#D97706" />
+                            <Text style={s.soundLabelText}>Notification Chime</Text>
+                        </View>
+                        <Text style={s.soundNameText} numberOfLines={1}>
+                            {activeTune?.name || 'Executive Crystal Bell'}
+                        </Text>
+                    </View>
+                    <View style={s.soundActionsRow}>
+                        <TouchableOpacity
+                            onPress={async () => {
+                                if (isPlayingTune) {
+                                    setIsPlayingTune(false);
+                                } else {
+                                    setIsPlayingTune(true);
+                                    if (Platform.OS !== 'web') {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    }
+                                    await playDeviceAlertSound(activeTune?.uri);
+                                    setTimeout(() => setIsPlayingTune(false), 3500);
+                                }
+                            }}
+                            style={s.soundPreviewBtn}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name={isPlayingTune ? "pause" : "volume-high"} size={13} color="#0F172A" />
+                            <Text style={s.soundPreviewBtnText}>{isPlayingTune ? 'Playing...' : 'Test'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={async () => {
+                                const nextMuted = !isMuted;
+                                setIsMuted(nextMuted);
+                                await AsyncStorage.setItem('user_notifications_muted', nextMuted ? 'true' : 'false');
+                                if (Platform.OS !== 'web') {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }
+                            }}
+                            style={[s.soundMuteBtn, isMuted && s.soundMuteBtnActive]}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name={isMuted ? "volume-mute" : "notifications"} size={13} color={isMuted ? "#EF4444" : "#64748B"} />
+                            <Text style={[s.soundMuteBtnText, isMuted && s.soundMuteBtnTextActive]}>{isMuted ? 'Muted' : 'Sound On'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* Category Filter Chips Bar */}
                 <View style={s.filterBarRow}>
                     <TouchableOpacity
@@ -1210,5 +1288,88 @@ const s = StyleSheet.create({
         color: '#B45309',
         fontSize: 10,
         fontWeight: '800',
+    },
+    soundControlBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    soundInfoCol: {
+        flex: 1,
+        marginRight: 8,
+    },
+    soundLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 2,
+    },
+    soundLabelText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#D97706',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    soundNameText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    soundActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    soundPreviewBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    soundPreviewBtnText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    soundMuteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    soundMuteBtnActive: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+    },
+    soundMuteBtnText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    soundMuteBtnTextActive: {
+        color: '#EF4444',
     },
 });

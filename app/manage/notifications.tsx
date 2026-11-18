@@ -23,7 +23,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
-import { sendInstantNotification, GLOBAL_RINGTONES } from '../../hooks/usePushNotifications';
+import { sendInstantNotification, GLOBAL_RINGTONES, syncGlobalNotificationRingtone } from '../../hooks/usePushNotifications';
 import { AIService } from '../../services/ai';
 import { uploadMediaFile } from '../../services/mediaUpload';
 
@@ -285,21 +285,33 @@ export default function AdminPushNotificationsScreen() {
                 }
                 if (typeof parsedActive === 'object' && parsedActive) {
                     targetToneId = parsedActive.id || parsedActive.ringtone || '';
+                    await AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(parsedActive));
                 } else if (typeof parsedActive === 'string') {
                     targetToneId = parsedActive;
                 }
             }
 
             if (!targetToneId) {
-                targetToneId = await AsyncStorage.getItem('global_notification_ringtone') || 'executive_bell';
+                const stored = await AsyncStorage.getItem('global_notification_ringtone');
+                if (stored) {
+                    if (stored.startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(stored);
+                            targetToneId = parsed.id || '';
+                        } catch (_) {}
+                    } else {
+                        targetToneId = stored;
+                    }
+                }
             }
 
-            if (targetToneId) {
-                setAdminRingtone(targetToneId);
-                setSelectedRingtoneForPush(targetToneId);
-                await AsyncStorage.setItem('admin_preferred_ringtone', targetToneId);
-                await AsyncStorage.setItem('global_notification_ringtone', targetToneId);
+            if (!targetToneId) {
+                targetToneId = 'executive_bell';
             }
+
+            setAdminRingtone(targetToneId);
+            setSelectedRingtoneForPush(targetToneId);
+            await AsyncStorage.setItem('admin_preferred_ringtone', targetToneId);
         } catch (e) {
             console.log('Error loading saved ringtones:', e);
         }
@@ -360,7 +372,7 @@ export default function AdminPushNotificationsScreen() {
             // Persist to Supabase app_settings so all devices get the new ringtone
             const { error: catErr } = await supabase.from('app_settings').upsert({
                 key: 'admin_custom_ringtones_catalog',
-                value: customsOnly,
+                value: JSON.stringify(customsOnly),
                 description: 'Custom ringtones uploaded by Admin',
                 updated_at: new Date().toISOString()
             }, { onConflict: 'key' });
@@ -386,7 +398,6 @@ export default function AdminPushNotificationsScreen() {
             setAdminRingtone(toneId);
             setSelectedRingtoneForPush(toneId);
             await AsyncStorage.setItem('admin_preferred_ringtone', toneId);
-            await AsyncStorage.setItem('global_notification_ringtone', toneId);
 
             const activeCat = customCatalog || ringtoneCatalog;
             const chosenTone = activeCat.find((r: any) => r.id === toneId);
@@ -394,10 +405,13 @@ export default function AdminPushNotificationsScreen() {
             const soundUri = chosenTone?.uri || (GLOBAL_RINGTONES as any)[toneId] || '';
             const soundName = chosenTone?.name || toneId;
 
+            const tonePayload = { id: toneId, uri: soundUri, name: soundName };
+            await AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(tonePayload));
+
             // Persist globally into app_settings so ALL users and devices ring with this sound
             const { error: dbErr } = await supabase.from('app_settings').upsert({
                 key: 'global_notification_ringtone',
-                value: { id: toneId, uri: soundUri, name: soundName },
+                value: JSON.stringify(tonePayload),
                 description: 'Global system notification ringtone sound configured from Admin Panel',
                 updated_at: new Date().toISOString()
             }, { onConflict: 'key' });
@@ -407,10 +421,13 @@ export default function AdminPushNotificationsScreen() {
                 throw new Error(dbErr.message || 'Failed to update database setting.');
             }
 
+            // Sync in-memory global audio engine immediately
+            await syncGlobalNotificationRingtone();
+
             playPreviewSound(toneId, activeCat);
             Alert.alert(
-                'Ringtone Saved',
-                `"${soundName}" is now active and set as the notification alert sound on all user devices.`
+                'Ringtone Saved Globally',
+                `"${soundName}" is now active and set as the notification alert sound across all user devices.`
             );
         } catch (e: any) {
             Alert.alert('Save Error', e.message || 'Could not save ringtone.');

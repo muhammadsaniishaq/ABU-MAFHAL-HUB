@@ -17,107 +17,210 @@ export const GLOBAL_RINGTONES: Record<string, string> = {
   subtle_chime: 'https://abumafhal.com.ng/sounds/subtle_chime.wav',
 };
 
-// Play ringtone on the device using Audio.Sound (supports predefined key, direct URL, or dynamic app_settings sync)
+export interface GlobalNotificationTune {
+  id: string;
+  uri: string;
+  name: string;
+}
+
+// In-memory cache for instant zero-latency playback across all screens and notifications
+let cachedGlobalTune: GlobalNotificationTune | null = null;
+let activeSoundInstance: Audio.Sound | null = null;
+let activeWebAudioInstance: any = null;
+
+/**
+ * Synchronize the latest Global Notification Ringtone from Supabase app_settings & AsyncStorage
+ */
+export async function syncGlobalNotificationRingtone(): Promise<GlobalNotificationTune | null> {
+  try {
+    // 1. Try reading from database (source of truth)
+    const { data: dbTone } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'global_notification_ringtone')
+      .maybeSingle();
+
+    if (dbTone?.value) {
+      let parsed: any = dbTone.value;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (_) {}
+      }
+
+      if (parsed && typeof parsed === 'object' && parsed.uri) {
+        cachedGlobalTune = {
+          id: String(parsed.id || 'custom'),
+          uri: String(parsed.uri).trim(),
+          name: String(parsed.name || 'Custom Tune').trim()
+        };
+        await AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(cachedGlobalTune));
+        return cachedGlobalTune;
+      } else if (typeof parsed === 'string') {
+        const trimmed = parsed.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          cachedGlobalTune = { id: 'custom', uri: trimmed, name: 'Cloud Custom Tune' };
+          await AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(cachedGlobalTune));
+          return cachedGlobalTune;
+        } else if (GLOBAL_RINGTONES[trimmed]) {
+          cachedGlobalTune = { id: trimmed, uri: GLOBAL_RINGTONES[trimmed], name: trimmed.replace(/_/g, ' ') };
+          await AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(cachedGlobalTune));
+          return cachedGlobalTune;
+        }
+      }
+    }
+
+    // 2. Fallback to AsyncStorage cache
+    const stored = await AsyncStorage.getItem('global_notification_ringtone');
+    if (stored) {
+      if (stored.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.uri) {
+            cachedGlobalTune = {
+              id: parsed.id || 'custom',
+              uri: parsed.uri,
+              name: parsed.name || 'Notification Tune'
+            };
+            return cachedGlobalTune;
+          }
+        } catch (_) {}
+      } else if (stored.startsWith('http://') || stored.startsWith('https://')) {
+        cachedGlobalTune = { id: 'custom', uri: stored, name: 'Custom Tune' };
+        return cachedGlobalTune;
+      } else if (GLOBAL_RINGTONES[stored]) {
+        cachedGlobalTune = { id: stored, uri: GLOBAL_RINGTONES[stored], name: stored.replace(/_/g, ' ') };
+        return cachedGlobalTune;
+      }
+    }
+
+    // 3. Ultimate default
+    cachedGlobalTune = {
+      id: 'executive_bell',
+      uri: GLOBAL_RINGTONES['executive_bell'],
+      name: 'Executive Crystal Bell'
+    };
+    return cachedGlobalTune;
+  } catch (err) {
+    console.warn('[PushSound] syncGlobalNotificationRingtone note:', err);
+    if (!cachedGlobalTune) {
+      cachedGlobalTune = {
+        id: 'executive_bell',
+        uri: GLOBAL_RINGTONES['executive_bell'],
+        name: 'Executive Crystal Bell'
+      };
+    }
+    return cachedGlobalTune;
+  }
+}
+
+/**
+ * Returns current global notification tune (with automatic lazy initialization)
+ */
+export async function getGlobalNotificationTune(): Promise<GlobalNotificationTune> {
+  if (cachedGlobalTune && cachedGlobalTune.uri) {
+    return cachedGlobalTune;
+  }
+  const loaded = await syncGlobalNotificationRingtone();
+  return loaded || {
+    id: 'executive_bell',
+    uri: GLOBAL_RINGTONES['executive_bell'],
+    name: 'Executive Crystal Bell'
+  };
+}
+
+/**
+ * Bulletproof, zero-crash Audio player for incoming notifications
+ * Ensures seamless playback on both Android, iOS and Web without resource leaks
+ */
 export async function playDeviceAlertSound(toneKeyOrUri?: string) {
   try {
-    let sourceUri = '';
+    // Check if user has muted sound in preferences
+    const isMuted = await AsyncStorage.getItem('user_notifications_muted');
+    if (isMuted === 'true') {
+      return;
+    }
 
-    // Direct HTTP(S) URL
+    let targetUri = '';
+
+    // 1. Direct HTTP(S) URL
     if (toneKeyOrUri && (toneKeyOrUri.startsWith('http://') || toneKeyOrUri.startsWith('https://'))) {
-      sourceUri = toneKeyOrUri;
-    } else {
-      let key = toneKeyOrUri;
-      if (!key) {
-        key = await AsyncStorage.getItem('global_notification_ringtone') || '';
-      }
-
-      // Check if stored key is a JSON string containing uri or id
-      if (key && typeof key === 'string' && key.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(key);
-          if (parsed.uri && (parsed.uri.startsWith('http://') || parsed.uri.startsWith('https://'))) {
-            sourceUri = parsed.uri;
-          } else if (parsed.id) {
-            key = parsed.id;
-          }
-        } catch (_) {}
-      }
-
-      if (!sourceUri && key) {
-        if (key.startsWith('http://') || key.startsWith('https://')) {
-          sourceUri = key;
-        } else if (GLOBAL_RINGTONES[key]) {
-          sourceUri = GLOBAL_RINGTONES[key];
-        }
-      }
-
-      // If still unknown or custom, fetch real-time from Supabase app_settings
-      if (!sourceUri) {
-        try {
-          const { data: dbTone } = await supabase
-            .from('app_settings')
-            .select('value')
-            .eq('key', 'global_notification_ringtone')
-            .maybeSingle();
-
-          if (dbTone?.value) {
-            let val = dbTone.value;
-            if (typeof val === 'string' && val.startsWith('{')) {
-              try { val = JSON.parse(val); } catch (_) {}
-            }
-
-            if (val && typeof val === 'object') {
-              if (val.uri && (val.uri.startsWith('http://') || val.uri.startsWith('https://'))) {
-                sourceUri = val.uri;
-              } else if (val.id && GLOBAL_RINGTONES[val.id]) {
-                sourceUri = GLOBAL_RINGTONES[val.id];
-              }
-            } else if (typeof val === 'string') {
-              if (val.startsWith('http://') || val.startsWith('https://')) {
-                sourceUri = val;
-              } else if (GLOBAL_RINGTONES[val]) {
-                sourceUri = GLOBAL_RINGTONES[val];
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (!sourceUri || (!sourceUri.startsWith('http://') && !sourceUri.startsWith('https://'))) {
-        sourceUri = GLOBAL_RINGTONES['executive_bell'];
-      }
+      targetUri = toneKeyOrUri;
+    } 
+    // 2. Specific built-in key override if valid
+    else if (toneKeyOrUri && GLOBAL_RINGTONES[toneKeyOrUri]) {
+      targetUri = GLOBAL_RINGTONES[toneKeyOrUri];
+    } 
+    // 3. Cached active global tune
+    else if (cachedGlobalTune?.uri) {
+      targetUri = cachedGlobalTune.uri;
     }
 
-    if (sourceUri) {
-      if (Platform.OS === 'web') {
-        try {
-          if (typeof window !== 'undefined' && (window as any).Audio) {
-            const webAudio = new (window as any).Audio(sourceUri);
-            webAudio.volume = 1.0;
-            webAudio.play().catch(() => {});
-            return;
-          }
-        } catch (_) {}
-      }
-
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      }).catch(() => {});
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: sourceUri },
-        { shouldPlay: true, volume: 1.0 }
-      );
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
-        }
-      });
+    // 4. Fallback lookup if cache is not yet warm
+    if (!targetUri) {
+      const activeTune = await getGlobalNotificationTune();
+      targetUri = activeTune.uri;
     }
+
+    if (!targetUri) {
+      targetUri = GLOBAL_RINGTONES['executive_bell'];
+    }
+
+    // --- Web Audio Playback ---
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof window !== 'undefined' && (window as any).Audio) {
+          if (activeWebAudioInstance) {
+            try {
+              activeWebAudioInstance.pause();
+              activeWebAudioInstance = null;
+            } catch (_) {}
+          }
+          const webAudio = new (window as any).Audio(targetUri);
+          webAudio.volume = 1.0;
+          activeWebAudioInstance = webAudio;
+          webAudio.onended = () => {
+            if (activeWebAudioInstance === webAudio) activeWebAudioInstance = null;
+          };
+          webAudio.play().catch((e: any) => {
+            console.log('[PushSound] Web Audio blocked or error:', e);
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // --- Native Mobile Playback (Android / iOS) ---
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    }).catch(() => {});
+
+    // Safely unload any playing sound to prevent concurrent stream crashes / memory exhaustion
+    if (activeSoundInstance) {
+      try {
+        await activeSoundInstance.stopAsync();
+        await activeSoundInstance.unloadAsync();
+      } catch (_) {}
+      activeSoundInstance = null;
+    }
+
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: targetUri },
+      { shouldPlay: true, volume: 1.0 }
+    );
+    activeSoundInstance = sound;
+
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+        sound.unloadAsync().catch(() => {});
+        if (activeSoundInstance === sound) {
+          activeSoundInstance = null;
+        }
+      }
+    });
   } catch (err) {
-    console.log('[PushSound] Audio playback error:', err);
+    console.log('[PushSound] Audio playback note (handled):', err);
   }
 }
 
@@ -420,7 +523,7 @@ export function usePushNotifications() {
                   route: '/(app)/history', 
                   transaction_id: tr.id, 
                   is_funding: isFunding,
-                  ringtone: isFunding ? 'cash_register' : 'subtle_chime'
+                  // Do not force ringtone override so the global notification tune is used
                 },
                 'transactions'
               );
@@ -433,6 +536,41 @@ export function usePushNotifications() {
         console.warn('[Push] Realtime setup note:', err);
       }
     };
+
+    // Pre-load & synchronize global notification ringtone
+    syncGlobalNotificationRingtone();
+
+    // Realtime Global Notification Tune Listener (Syncs changes made by admin instantly to all active devices)
+    const tuneChannel = supabase
+      .channel('global-notification-tune-listener')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'app_settings',
+          filter: 'key=eq.global_notification_ringtone',
+        },
+        (payload) => {
+          const newRow = payload.new as any;
+          if (newRow?.value) {
+            let parsed: any = newRow.value;
+            if (typeof parsed === 'string') {
+              try { parsed = JSON.parse(parsed); } catch (_) {}
+            }
+            if (parsed && typeof parsed === 'object' && parsed.uri) {
+              cachedGlobalTune = {
+                id: String(parsed.id || 'custom'),
+                uri: String(parsed.uri).trim(),
+                name: String(parsed.name || 'Notification Tune').trim()
+              };
+              AsyncStorage.setItem('global_notification_ringtone', JSON.stringify(cachedGlobalTune)).catch(() => {});
+              console.log('[PushSound] Realtime synchronized global notification tune:', cachedGlobalTune.name);
+            }
+          }
+        }
+      )
+      .subscribe();
 
     // Initial Registration
     registerForPushNotificationsAsync().then((token) => {
@@ -517,6 +655,9 @@ export function usePushNotifications() {
     return () => {
       isMounted = false;
       authSubscription.unsubscribe();
+      if (tuneChannel) {
+        supabase.removeChannel(tuneChannel);
+      }
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
