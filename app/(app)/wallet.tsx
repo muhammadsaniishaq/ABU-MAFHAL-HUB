@@ -48,6 +48,9 @@ export default function WalletScreen() {
     // Paystack States
     const [fundAmount, setFundAmount] = useState('');
     const [paystackVisible, setPaystackVisible] = useState(false);
+    const [paystackAuthUrl, setPaystackAuthUrl] = useState('');
+    const [paystackRef, setPaystackRef] = useState('');
+    const [isInitializingPaystack, setIsInitializingPaystack] = useState(false);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [manualRefInput, setManualRefInput] = useState('');
     const [isVerifyingManual, setIsVerifyingManual] = useState(false);
@@ -362,6 +365,8 @@ export default function WalletScreen() {
     const handlePaystackSuccess = async (response: any) => {
         try {
             setPaystackVisible(false);
+            setPaystackAuthUrl('');
+            setPaystackRef('');
             setVerifyingPayment(true);
             setVerifyStatusText('Verifying payment with Paystack...');
 
@@ -938,31 +943,70 @@ export default function WalletScreen() {
                                             Alert.alert("Invalid Amount", "Please enter an amount of at least ₦100.");
                                             return;
                                         }
-                                        if (!paystackKey) {
-                                            // Quick fallback fetch if key was still loading
-                                            try {
-                                                const { data: edgeRes } = await supabase.functions.invoke('payment-webhook', {
-                                                    body: { action: 'get_paystack_public_key' }
-                                                });
-                                                if (edgeRes?.publicKey && edgeRes.publicKey.length > 10) {
-                                                    setPaystackKey(edgeRes.publicKey.trim());
-                                                    setPaystackVisible(true);
-                                                    setFundModalVisible(false);
-                                                    return;
+
+                                        setIsInitializingPaystack(true);
+                                        try {
+                                            // 1. Try server-side standard checkout initialization (most reliable on mobile & Play Store)
+                                            const { data: initRes, error: initErr } = await supabase.functions.invoke('payment-webhook', {
+                                                body: {
+                                                    action: 'initialize_paystack',
+                                                    amount: numAmt,
+                                                    email: userEmail || 'customer@abumafhal.com.ng',
+                                                    userId: currentUserId
                                                 }
-                                            } catch (e) {
-                                                console.warn("Key retry notice:", e);
+                                            });
+
+                                            if (!initErr && initRes?.success && initRes?.authorization_url) {
+                                                setPaystackAuthUrl(initRes.authorization_url);
+                                                setPaystackRef(initRes.reference || '');
+                                                setFundModalVisible(false);
+                                                setPaystackVisible(true);
+                                                return;
                                             }
-                                            Alert.alert("Connection Error", "Paystack public key is not available right now. Please try again or contact support.");
-                                            return;
+
+                                            // 2. Fallback to inline popup if standard checkout had an issue but public key exists
+                                            if (paystackKey) {
+                                                setPaystackAuthUrl('');
+                                                setPaystackRef('');
+                                                setFundModalVisible(false);
+                                                setPaystackVisible(true);
+                                                return;
+                                            }
+
+                                            // 3. Fallback: attempt to fetch public key if not yet loaded
+                                            const { data: edgeRes } = await supabase.functions.invoke('payment-webhook', {
+                                                body: { action: 'get_paystack_public_key' }
+                                            });
+                                            if (edgeRes?.publicKey && edgeRes.publicKey.length > 10) {
+                                                setPaystackKey(edgeRes.publicKey.trim());
+                                                setPaystackAuthUrl('');
+                                                setPaystackRef('');
+                                                setFundModalVisible(false);
+                                                setPaystackVisible(true);
+                                                return;
+                                            }
+
+                                            const errorMsg = initRes?.error || "Paystack card payment gateway is currently unavailable. Please try again shortly or use direct bank transfer.";
+                                            Alert.alert("Payment Gateway Notice", errorMsg);
+                                        } catch (e: any) {
+                                            console.error('[Wallet] Paystack initialization error:', e);
+                                            Alert.alert("Connection Error", "Could not connect to payment gateway. Please check your internet connection and try again.");
+                                        } finally {
+                                            setIsInitializingPaystack(false);
                                         }
-                                        setPaystackVisible(true);
-                                        setFundModalVisible(false);
                                     }}
-                                    style={s.submitPayBtn}
+                                    style={[s.submitPayBtn, isInitializingPaystack && { opacity: 0.8 }]}
                                     activeOpacity={0.85}
+                                    disabled={isInitializingPaystack}
                                 >
-                                    <Text style={s.submitPayBtnText}>Pay with Card • ₦{fundAmount || '0.00'}</Text>
+                                    {isInitializingPaystack ? (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                            <Text style={s.submitPayBtnText}>Opening Secure Gateway...</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={s.submitPayBtnText}>Pay with Card • ₦{fundAmount || '0.00'}</Text>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -1020,16 +1064,27 @@ export default function WalletScreen() {
             </Modal>
 
             {/* Paystack Modal Handler */}
-            {paystackVisible && paystackKey && (
+            {paystackVisible && (paystackAuthUrl || paystackKey) && (
                 <PaystackPayment
                     visible={paystackVisible}
                     amount={Number(fundAmount)}
                     email={userEmail || 'customer@abumafhal.com.ng'}
                     userId={currentUserId}
                     publicKey={paystackKey}
+                    authorizationUrl={paystackAuthUrl}
+                    reference={paystackRef}
                     onSuccess={handlePaystackSuccess}
-                    onCancel={() => Alert.alert("Payment Cancelled", "You cancelled the payment. Your account was not charged.")}
-                    onClose={() => setPaystackVisible(false)}
+                    onCancel={() => {
+                        setPaystackVisible(false);
+                        setPaystackAuthUrl('');
+                        setPaystackRef('');
+                        Alert.alert("Payment Cancelled", "You cancelled the payment. Your account was not charged.");
+                    }}
+                    onClose={() => {
+                        setPaystackVisible(false);
+                        setPaystackAuthUrl('');
+                        setPaystackRef('');
+                    }}
                 />
             )}
 

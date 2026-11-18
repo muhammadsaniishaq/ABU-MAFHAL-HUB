@@ -1986,13 +1986,18 @@ $$ language plpgsql security definer;
         if (parsedPayload && (parsedPayload.action === 'get_paystack_public_key' || parsedPayload.action === 'get_public_keys')) {
             let publicKey = '';
             try {
-                const { data: sec } = await supabaseAdmin
+                const { data: secList } = await supabaseAdmin
                     .from('system_secrets')
-                    .select('value')
-                    .in('key', ['PAYSTACK_PUBLIC_KEY', 'PAYSTACK_PUB', 'PAYSTACK_KEY'])
-                    .maybeSingle();
-                if (sec?.value && sec.value.trim().length > 10) {
-                    publicKey = sec.value.trim();
+                    .select('key, value')
+                    .in('key', ['PAYSTACK_PUBLIC_KEY', 'PAYSTACK_PUB', 'PAYSTACK_PUB_KEY', 'PAYSTACK_KEY']);
+                if (secList && secList.length > 0) {
+                    for (const item of secList) {
+                        const val = (item.value || '').trim();
+                        if (val.startsWith('pk_')) {
+                            publicKey = val;
+                            break;
+                        }
+                    }
                 }
             } catch (e) {
                 console.warn("[GetPaystackKey] system_secrets query warning:", e);
@@ -2017,9 +2022,116 @@ $$ language plpgsql security definer;
                 publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY')?.trim() || '';
             }
 
+            if (publicKey) {
+                try {
+                    await supabaseAdmin.from('app_settings').upsert({
+                        key: 'paystack_public_key',
+                        value: publicKey,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                } catch (_) {}
+            }
+
             return new Response(JSON.stringify({ success: true, publicKey }), {
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
+        }
+
+        // --- ACTION: INITIALIZE PAYSTACK TRANSACTION (STANDARD MOBILE CHECKOUT) ---
+        if (parsedPayload && (parsedPayload.action === 'initialize_paystack' || parsedPayload.action === 'init_card_payment')) {
+            const amountInNaira = parseFloat(parsedPayload.amount || 0);
+            const userEmail = (parsedPayload.email || '').trim();
+            const userId = (parsedPayload.userId || parsedPayload.user_id || '').trim();
+
+            if (!amountInNaira || isNaN(amountInNaira) || amountInNaira < 100) {
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: "Minimum funding amount is ₦100" 
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            const paystackSecret = await getPaystackSecret(supabaseAdmin);
+            if (!paystackSecret) {
+                console.error("[InitPaystack] Missing PAYSTACK_SECRET_KEY in env and system_secrets");
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: "Payment gateway is currently not configured properly. Please contact support." 
+                }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
+
+            const cleanUserId = userId.replace(/[^a-zA-Z0-9]/g, '') || 'GUEST';
+            const reference = `PAY_${cleanUserId}_${Date.now()}`;
+            const amountKobo = Math.round(amountInNaira * 100);
+            const validEmail = userEmail && userEmail.includes('@') ? userEmail : `${cleanUserId}@abumafhal.com.ng`;
+            const callbackUrl = 'https://standard.paystack.co/close';
+
+            try {
+                const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${paystackSecret}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: validEmail,
+                        amount: amountKobo,
+                        reference: reference,
+                        callback_url: callbackUrl,
+                        metadata: {
+                            user_id: userId,
+                            custom_fields: [
+                                {
+                                    display_name: "User ID",
+                                    variable_name: "user_id",
+                                    value: userId
+                                }
+                            ]
+                        },
+                        channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']
+                    })
+                });
+
+                const initData = await initRes.json();
+                console.log(`[InitPaystack] Paystack response for Ref: ${reference}`, {
+                    status: initData.status,
+                    hasAuthUrl: !!initData.data?.authorization_url,
+                    message: initData.message
+                });
+
+                if (!initData.status || !initData.data?.authorization_url) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        error: initData.message || "Could not initialize Paystack card payment" 
+                    }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json", ...corsHeaders }
+                    });
+                }
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    authorization_url: initData.data.authorization_url,
+                    access_code: initData.data.access_code,
+                    reference: reference
+                }), {
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            } catch (initErr: any) {
+                console.error("[InitPaystack] Exception during Paystack initialization:", initErr);
+                return new Response(JSON.stringify({ 
+                    success: false, 
+                    error: initErr.message || "Failed to reach Paystack servers" 
+                }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json", ...corsHeaders }
+                });
+            }
         }
 
         // --- 1. DIRECT IN-APP CLIENT VERIFICATION (Paystack Checkout) ---
