@@ -759,7 +759,17 @@ export default function WalletScreen() {
                         <View style={s.modalDragBar} />
 
                         <View style={s.modalHeaderRow}>
-                            <Text style={s.modalTitleText}>Fund Wallet</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={s.modalTitleText}>Fund Wallet</Text>
+                                <TouchableOpacity
+                                    onPress={() => setShowVerifyModal(true)}
+                                    style={s.reconcileMiniBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="receipt-outline" size={11} color="#B45309" />
+                                    <Text style={s.reconcileMiniBtnText}>Reconcile Ref</Text>
+                                </TouchableOpacity>
+                            </View>
                             <TouchableOpacity onPress={() => setFundModalVisible(false)} style={s.modalCloseIconBtn}>
                                 <Ionicons name="close" size={18} color="#64748B" />
                             </TouchableOpacity>
@@ -861,81 +871,115 @@ export default function WalletScreen() {
 
                             </ScrollView>
                         ) : (
-                            <View style={{ flex: 1 }}>
-                                <Text style={s.modalInstructionText}>
-                                    Fund your wallet instantly using Debit Card or USSD via Paystack.
-                                </Text>
-
-                                {/* Modernized Clean Input (No inner rawani/wrapper) */}
-                                <Text style={s.modernFieldHeader}>ENTER RECHARGE AMOUNT</Text>
-                                <View style={s.modernAmountCard}>
-                                    <View style={s.modernCurrencyTag}>
-                                        <Text style={s.modernCurrencyTagText}>₦ NGN</Text>
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+                                {/* Channel & Gateway Trust Banner */}
+                                <View style={s.cardTrustBanner}>
+                                    <View style={s.cardTrustLeft}>
+                                        <View style={s.paystackLogoBadge}>
+                                            <Ionicons name="card" size={13} color="#00C3F7" />
+                                            <Text style={s.paystackLogoBadgeTxt}>PAYSTACK CHECKOUT</Text>
+                                        </View>
+                                        <Text style={s.cardTrustSub}>Automated Realtime Funding</Text>
                                     </View>
-                                    <TextInput
-                                        value={fundAmount}
-                                        onChangeText={setFundAmount}
-                                        keyboardType="numeric"
-                                        placeholder="5000"
-                                        placeholderTextColor="#94A3B8"
-                                        style={s.modernAmountInput}
-                                    />
+                                    <View style={s.cardChannelPillsRow}>
+                                        <View style={s.channelPill}>
+                                            <Text style={s.channelPillTxt}>Mastercard</Text>
+                                        </View>
+                                        <View style={s.channelPill}>
+                                            <Text style={s.channelPillTxt}>Visa</Text>
+                                        </View>
+                                        <View style={s.channelPill}>
+                                            <Text style={s.channelPillTxt}>Verve</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Modernized Clean Amount Card */}
+                                <View style={s.modernAmountCardElevated}>
+                                    <View style={s.modernAmountCardTop}>
+                                        <Text style={s.modernFieldHeaderSmall}>ENTER RECHARGE AMOUNT</Text>
+                                        <View style={s.minDepositBadge}>
+                                            <Text style={s.minDepositTag}>Min ₦100</Text>
+                                        </View>
+                                    </View>
+                                    <View style={s.modernAmountInputRow}>
+                                        <View style={s.modernCurrencyPill}>
+                                            <Text style={s.modernCurrencyPillTxt}>₦</Text>
+                                        </View>
+                                        <TextInput
+                                            value={fundAmount}
+                                            onChangeText={setFundAmount}
+                                            keyboardType="numeric"
+                                            placeholder="5000"
+                                            placeholderTextColor="#94A3B8"
+                                            style={s.modernAmountLargeInput}
+                                        />
+                                        {fundAmount.length > 0 && (
+                                            <TouchableOpacity onPress={() => setFundAmount('')} style={s.clearInputBtn} activeOpacity={0.7}>
+                                                <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
                                 </View>
 
                                 {/* Quick Amount Preset Chips */}
-                                <Text style={s.modernPresetHeader}>PRESET QUICK AMOUNTS</Text>
-                                <View style={s.modernPresetGrid}>
-                                    {['1000', '2500', '5000', '10000', '25000', '50000'].map(val => (
-                                        <TouchableOpacity
-                                            key={val}
-                                            style={[s.modernPresetChip, fundAmount === val && s.modernPresetChipActive]}
-                                            onPress={() => setFundAmount(val)}
-                                            activeOpacity={0.75}
-                                        >
-                                            <Text style={[s.modernPresetChipTxt, fundAmount === val && s.modernPresetChipTxtActive]}>
-                                                ₦{Number(val).toLocaleString()}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                <View style={s.modernPresetContainer}>
+                                    <Text style={s.modernPresetHeader}>SELECT QUICK AMOUNT</Text>
+                                    <View style={s.modernPresetGrid}>
+                                        {['1000', '2500', '5000', '10000', '25000', '50000'].map(val => (
+                                            <TouchableOpacity
+                                                key={val}
+                                                style={[s.modernPresetChip, fundAmount === val && s.modernPresetChipActive]}
+                                                onPress={() => setFundAmount(val)}
+                                                activeOpacity={0.75}
+                                            >
+                                                <Text style={[s.modernPresetChipTxt, fundAmount === val && s.modernPresetChipTxtActive]}>
+                                                    ₦{Number(val).toLocaleString()}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
                                 </View>
 
+                                {/* Realtime Financial Summary Breakdown */}
                                 {parseFloat(fundAmount) > 0 && (
-                                    <View style={s.liveCalcCard}>
-                                        <View style={s.liveCalcRow}>
-                                            <Text style={s.liveCalcLabel}>Deposit Amount:</Text>
-                                            <Text style={s.liveCalcVal}>₦{parseFloat(fundAmount).toLocaleString()}</Text>
+                                    <View style={s.modernSettlementCard}>
+                                        <View style={s.settlementCardHeader}>
+                                            <Ionicons name="receipt-outline" size={12} color="#0F172A" />
+                                            <Text style={s.settlementCardTitle}>Deposit Breakdown</Text>
                                         </View>
-
-                                        <View style={s.liveCalcRow}>
-                                            <Text style={s.liveCalcLabel}>
+                                        <View style={s.settlementRow}>
+                                            <Text style={s.settlementLabel}>Gross Deposit:</Text>
+                                            <Text style={s.settlementValue}>₦{parseFloat(fundAmount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
+                                        </View>
+                                        <View style={s.settlementRow}>
+                                            <Text style={s.settlementLabel}>
                                                 Processing Fee ({parseFloat(fundAmount) < feeThreshold ? `Fixed ₦${feeUnder}` : `${feeAbove}%`}):
                                             </Text>
-                                            <Text style={{ color: '#EF4444', fontSize: 10.5, fontWeight: '700' }}>
-                                                -₦{(parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100)).toLocaleString()}
+                                            <Text style={s.settlementFeeVal}>
+                                                -₦{(parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100)).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                                             </Text>
                                         </View>
-
-                                        <View style={s.liveCalcDivider} />
-
-                                        <View style={[s.liveCalcRow, { marginTop: 2 }]}>
-                                            <Text style={s.liveCalcNetLabel}>Net Amount to Wallet:</Text>
-                                            <Text style={s.liveCalcNetVal}>
-                                                ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100))).toLocaleString()}
+                                        <View style={s.settlementDivider} />
+                                        <View style={s.settlementNetRow}>
+                                            <View>
+                                                <Text style={s.settlementNetLabel}>Net Amount to Wallet:</Text>
+                                                <Text style={s.settlementSpeedTag}>⚡ Instant Automated Credit</Text>
+                                            </View>
+                                            <Text style={s.settlementNetValue}>
+                                                ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100))).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                                             </Text>
                                         </View>
                                     </View>
                                 )}
 
-                                <TouchableOpacity
-                                    onPress={() => setShowVerifyModal(true)}
-                                    style={{ marginTop: 10, marginBottom: 14, alignItems: 'center' }}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#D97706', textDecorationLine: 'underline' }}>
-                                        Already debited? Tap here to Verify Transaction Reference ➔
-                                    </Text>
-                                </TouchableOpacity>
+                                {/* Security Trust Footnote */}
+                                <View style={s.cardSecuritySealRow}>
+                                    <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                                    <Text style={s.cardSecuritySealTxt}>256-Bit SSL Encrypted • Card details are never stored</Text>
+                                </View>
 
+                                {/* Executive Action Button */}
                                 <TouchableOpacity
                                     onPress={async () => {
                                         const numAmt = parseFloat(fundAmount);
@@ -995,20 +1039,25 @@ export default function WalletScreen() {
                                             setIsInitializingPaystack(false);
                                         }
                                     }}
-                                    style={[s.submitPayBtn, isInitializingPaystack && { opacity: 0.8 }]}
+                                    style={[s.modernPayBtn, isInitializingPaystack && { opacity: 0.8 }]}
                                     activeOpacity={0.85}
                                     disabled={isInitializingPaystack}
                                 >
                                     {isInitializingPaystack ? (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                        <View style={s.modernPayBtnContent}>
                                             <ActivityIndicator size="small" color="#FFFFFF" />
-                                            <Text style={s.submitPayBtnText}>Opening Secure Gateway...</Text>
+                                            <Text style={s.modernPayBtnText}>Opening Secure Gateway...</Text>
                                         </View>
                                     ) : (
-                                        <Text style={s.submitPayBtnText}>Pay with Card • ₦{fundAmount || '0.00'}</Text>
+                                        <View style={s.modernPayBtnContent}>
+                                            <Ionicons name="lock-closed" size={14} color="#FFFFFF" />
+                                            <Text style={s.modernPayBtnText}>
+                                                Pay with Card • ₦{fundAmount ? Number(fundAmount).toLocaleString() : '0.00'}
+                                            </Text>
+                                        </View>
                                     )}
                                 </TouchableOpacity>
-                            </View>
+                            </ScrollView>
                         )}
                     </View>
                 </View>
@@ -2128,6 +2177,250 @@ const s = StyleSheet.create({
         fontSize: 11.5,
         fontWeight: '900',
         textTransform: 'uppercase',
+    },
+    reconcileMiniBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3.5,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    reconcileMiniBtnText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#B45309',
+    },
+    cardTrustBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    cardTrustLeft: {
+        flexDirection: 'column',
+    },
+    paystackLogoBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    paystackLogoBadgeTxt: {
+        fontSize: 10.5,
+        fontWeight: '900',
+        color: '#0F172A',
+        letterSpacing: 0.6,
+    },
+    cardTrustSub: {
+        fontSize: 9,
+        color: '#64748B',
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    cardChannelPillsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    channelPill: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 6,
+        paddingVertical: 2.5,
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    channelPillTxt: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        color: '#475569',
+    },
+    modernAmountCardElevated: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#F59E0B',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 12,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    modernAmountCardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    modernFieldHeaderSmall: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#64748B',
+        letterSpacing: 0.6,
+    },
+    minDepositBadge: {
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    minDepositTag: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#059669',
+    },
+    modernAmountInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    modernCurrencyPill: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    modernCurrencyPillTxt: {
+        color: '#B45309',
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    modernAmountLargeInput: {
+        flex: 1,
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#0F172A',
+        padding: 0,
+    },
+    clearInputBtn: {
+        padding: 4,
+    },
+    modernPresetContainer: {
+        marginBottom: 12,
+    },
+    modernSettlementCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 13,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+    },
+    settlementCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginBottom: 8,
+    },
+    settlementCardTitle: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#475569',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    settlementRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    settlementLabel: {
+        fontSize: 10.5,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    settlementValue: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '700',
+    },
+    settlementFeeVal: {
+        fontSize: 11,
+        color: '#EF4444',
+        fontWeight: '700',
+    },
+    settlementDivider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginVertical: 6,
+    },
+    settlementNetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    settlementNetLabel: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '800',
+    },
+    settlementSpeedTag: {
+        fontSize: 9,
+        color: '#059669',
+        fontWeight: '700',
+        marginTop: 1,
+    },
+    settlementNetValue: {
+        fontSize: 14,
+        color: '#059669',
+        fontWeight: '900',
+    },
+    cardSecuritySealRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        marginBottom: 14,
+    },
+    cardSecuritySealTxt: {
+        fontSize: 10,
+        color: '#64748B',
+        fontWeight: '600',
+    },
+    modernPayBtn: {
+        backgroundColor: '#0F172A',
+        borderRadius: 14,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F59E0B',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    modernPayBtnContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    modernPayBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.3,
     },
     verifyModalBackdrop: {
         flex: 1,

@@ -65,7 +65,7 @@ export default function PaystackPayment({
     const handleConfirmClose = () => {
         Alert.alert(
             "Cancel Payment?",
-            "Are you sure you want to cancel this payment? If you were already debited, your reference can still be verified.",
+            "Are you sure you want to cancel this payment transaction?",
             [
                 { text: "Stay Here", style: "cancel" },
                 {
