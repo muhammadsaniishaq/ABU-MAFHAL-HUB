@@ -83,8 +83,11 @@ export default function AdminPushNotificationsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
 
-    // Mode tabs: 'inbox' (Admin Alert Center) vs 'broadcasts' (Permanent Broadcast Archive) vs 'compose' (Send New Push)
-    const [activeTab, setActiveTab] = useState<'inbox' | 'broadcasts' | 'compose'>((params.tab as any) === 'compose' ? 'compose' : (params.tab as any) === 'broadcasts' ? 'broadcasts' : 'inbox');
+    // Mode tabs: 'compose' (Send New Push/Email Notification) vs 'broadcasts' (Permanent Broadcast Archive)
+    const [activeTab, setActiveTab] = useState<'compose' | 'broadcasts'>((params.tab as any) === 'broadcasts' ? 'broadcasts' : 'compose');
+    const [sendPushNotification, setSendPushNotification] = useState(true);
+    const [sendEmailNotification, setSendEmailNotification] = useState(true);
+    const [testingEmail, setTestingEmail] = useState(false);
     
     // Notifications Feed State
     const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
@@ -182,6 +185,38 @@ export default function AdminPushNotificationsScreen() {
             Alert.alert('AI Notice', e?.message || 'Could not generate message at this moment.');
         } finally {
             setGeneratingAI(false);
+        }
+    };
+
+    // Instant Email Gateway Verification Tester
+    const handleTestEmailGateway = async () => {
+        setTestingEmail(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const targetEmail = singleTargetQuery && singleTargetQuery.includes('@')
+                ? singleTargetQuery.trim()
+                : (user?.email || 'admin@abumafhal.com.ng');
+
+            const { data: testRes, error: testErr } = await supabase.functions.invoke('test-email', {
+                body: { to: targetEmail }
+            });
+
+            if (testErr || testRes?.error) {
+                const msg = testRes?.error || testErr?.message || 'Email delivery failed. Please check SMTP / Resend credentials in Admin Settings.';
+                Alert.alert('Email Gateway Notice ⚠️', msg);
+                setFormFeedback({ type: 'error', message: `Email test failed: ${msg}` });
+            } else {
+                const method = testRes?.info?.method || 'Resend/SMTP';
+                Alert.alert(
+                    'Email Delivered Successfully! 📬',
+                    `A live test notification email was successfully dispatched to ${targetEmail} via ${method}. Please check your inbox (and spam folder) now.`
+                );
+                setFormFeedback({ type: 'success', message: `Test email successfully dropped into ${targetEmail} via ${method}!` });
+            }
+        } catch (e: any) {
+            Alert.alert('Email Test Error', e?.message || 'Could not connect to email delivery service.');
+        } finally {
+            setTestingEmail(false);
         }
     };
 
@@ -642,6 +677,8 @@ export default function AdminPushNotificationsScreen() {
                         dispatchType,
                         isUrgent,
                         isPermanent,
+                        sendPushNotification,
+                        sendEmailNotification,
                         selectedRingtone: selectedRingtoneForPush,
                         singleTargetQuery: singleTargetQuery.trim(),
                         extraData
@@ -650,7 +687,10 @@ export default function AdminPushNotificationsScreen() {
 
                 if (!edgeErr && edgeRes?.status === 'success') {
                     dispatchedViaEdge = true;
-                    dispatchSummary = `Successfully dispatched to ${edgeRes.recipients || 1} recipient(s) (${edgeRes.tokensDispatched || 0} push token devices).`;
+                    const pushCount = edgeRes.tokensDispatched || 0;
+                    const emailCount = edgeRes.emailsDispatched || 0;
+                    const totalRecipients = edgeRes.recipients || 1;
+                    dispatchSummary = `Successfully dispatched to ${totalRecipients} recipient(s) (${pushCount} push devices, ${emailCount} email inboxes delivered).`;
                 }
             } catch (edgeCallErr) {
                 console.warn('Edge broadcast notice, engaging client fallback:', edgeCallErr);
@@ -840,62 +880,26 @@ export default function AdminPushNotificationsScreen() {
                     <View style={s.logoCircle}>
                         <Ionicons name="notifications" size={18} color={C.gold} />
                     </View>
-                    <View>
-                        <Text style={s.pageTitle}>Admin Push Center</Text>
-                        <Text style={s.pageSub}>User Tracking, Staff Meetings & Alerts</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={s.pageTitle} numberOfLines={1}>Push & Email Studio</Text>
+                        <Text style={s.pageSub} numberOfLines={1}>Direct Inbox, Mobile Push & Broadcasts</Text>
                     </View>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <TouchableOpacity
-                        onPress={() => setShowRingtoneModal(true)}
-                        style={s.ringtoneHeaderBtn}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="musical-notes" size={15} color={C.gold} />
-                        <View style={{ maxWidth: 110 }}>
-                            <Text style={s.ringtoneHeaderBtnText} numberOfLines={1}>
-                                {ringtoneCatalog.find(r => r.id === adminRingtone)?.name || 'Ringtone'}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-
-                    {activeTab === 'inbox' && unreadCount > 0 && (
-                        <TouchableOpacity onPress={markAllAsRead} style={s.markReadBtn} activeOpacity={0.8}>
-                            <Ionicons name="checkmark-done" size={14} color={C.blue} />
-                            <Text style={s.markReadText}>Read All</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                <TouchableOpacity
+                    onPress={() => setShowRingtoneModal(true)}
+                    style={s.ringtoneHeaderBtn}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="musical-notes" size={14} color={C.gold} />
+                    <Text style={s.ringtoneHeaderBtnText} numberOfLines={1}>
+                        {ringtoneCatalog.find(r => r.id === adminRingtone)?.name || 'Ringtone'}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
-            {/* Mode Switcher Tabs */}
+            {/* Mode Switcher Tabs (2 Balanced Clean Tabs) */}
             <View style={s.tabSwitcherBar}>
-                <TouchableOpacity
-                    onPress={() => setActiveTab('inbox')}
-                    style={[s.tabSwitchBtn, activeTab === 'inbox' && s.tabSwitchBtnActive]}
-                >
-                    <Ionicons name="notifications-outline" size={15} color={activeTab === 'inbox' ? '#FFFFFF' : C.textSub} />
-                    <Text style={[s.tabSwitchText, activeTab === 'inbox' && s.tabSwitchTextActive]}>
-                        Alerts
-                    </Text>
-                    {unreadCount > 0 && (
-                        <View style={s.tabBadge}>
-                            <Text style={s.tabBadgeText}>{unreadCount}</Text>
-                        </View>
-                    )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    onPress={() => setActiveTab('broadcasts')}
-                    style={[s.tabSwitchBtn, activeTab === 'broadcasts' && s.tabSwitchBtnActive]}
-                >
-                    <Ionicons name="archive-outline" size={15} color={activeTab === 'broadcasts' ? '#FFFFFF' : C.textSub} />
-                    <Text style={[s.tabSwitchText, activeTab === 'broadcasts' && s.tabSwitchTextActive]}>
-                        Broadcasts ({broadcastArchive.length})
-                    </Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity
                     onPress={() => {
                         setActiveTab('compose');
@@ -903,150 +907,25 @@ export default function AdminPushNotificationsScreen() {
                     }}
                     style={[s.tabSwitchBtn, activeTab === 'compose' && s.tabSwitchBtnActive]}
                 >
-                    <Ionicons name="paper-plane-outline" size={15} color={activeTab === 'compose' ? '#FFFFFF' : C.textSub} />
+                    <Ionicons name="paper-plane" size={15} color={activeTab === 'compose' ? '#FFFFFF' : C.textSub} />
                     <Text style={[s.tabSwitchText, activeTab === 'compose' && s.tabSwitchTextActive]}>
-                        Send Push
+                        Send Notification
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={() => setActiveTab('broadcasts')}
+                    style={[s.tabSwitchBtn, activeTab === 'broadcasts' && s.tabSwitchBtnActive]}
+                >
+                    <Ionicons name="archive" size={15} color={activeTab === 'broadcasts' ? '#FFFFFF' : C.textSub} />
+                    <Text style={[s.tabSwitchText, activeTab === 'broadcasts' && s.tabSwitchTextActive]}>
+                        Broadcast Archive ({broadcastArchive.length})
                     </Text>
                 </TouchableOpacity>
             </View>
 
-            {/* TAB 1: INBOX FEED (Dedicated Notifications Hub) */}
-            {activeTab === 'inbox' ? (
-                <View style={{ flex: 1 }}>
-                    {/* Category Quick Filter Chips */}
-                    <View style={s.filterContainer}>
-                        <View style={s.searchBox}>
-                            <Ionicons name="search-outline" size={16} color={C.textMuted} />
-                            <TextInput
-                                style={s.searchInput}
-                                placeholder="Search notifications by title or keyword..."
-                                placeholderTextColor="#94A3B8"
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                    <Ionicons name="close-circle" size={16} color={C.textMuted} />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                            <View style={{ flexDirection: 'row', gap: 6 }}>
-                                {[
-                                    { key: 'all', label: `All Alerts (${notifications.length})` },
-                                    { key: 'support_track', label: '🎧 User Tracking' },
-                                    { key: 'staff_meeting', label: '👥 Staff Meetings' },
-                                    { key: 'liquidity_low', label: '🚨 Liquidity Low' },
-                                    { key: 'system', label: '⚙️ System & Broadcasts' },
-                                ].map(c => {
-                                    const isActive = categoryFilter === c.key;
-                                    return (
-                                        <TouchableOpacity
-                                            key={c.key}
-                                            onPress={() => setCategoryFilter(c.key as any)}
-                                            style={[s.filterChip, isActive && s.filterChipActive]}
-                                        >
-                                            <Text style={[s.filterChipText, isActive && s.filterChipTextActive]}>
-                                                {c.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        </ScrollView>
-                    </View>
-
-                    {/* Feed List */}
-                    <ScrollView
-                        style={{ flex: 1 }}
-                        contentContainerStyle={s.feedScrollContent}
-                        showsVerticalScrollIndicator={false}
-                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}
-                    >
-                        {loading ? (
-                            <View style={{ paddingVertical: 50, alignItems: 'center' }}>
-                                <ActivityIndicator size="large" color={C.gold} />
-                                <Text style={{ marginTop: 10, fontSize: 13, color: C.textSub, fontWeight: '700' }}>
-                                    Connecting Realtime Alert Stream...
-                                </Text>
-                            </View>
-                        ) : filteredNotifications.length === 0 ? (
-                            <View style={s.emptyBox}>
-                                <Ionicons name="notifications-off-outline" size={42} color="#CBD5E1" />
-                                <Text style={s.emptyTitle}>No Notifications Found</Text>
-                                <Text style={s.emptySub}>
-                                    All customer tracks, staff meetings, and provider float alerts will display here in realtime.
-                                </Text>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setActiveTab('compose');
-                                        applyComposePreset('staff_meeting');
-                                    }}
-                                    style={s.emptyActionBtn}
-                                >
-                                    <Ionicons name="add-circle" size={16} color="#FFFFFF" />
-                                    <Text style={s.emptyActionBtnText}>Send New Push Notification</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            filteredNotifications.map(item => {
-                                const iconMeta = getIconForType(item.type, item.title);
-                                const isUnread = !item.is_read;
-                                return (
-                                    <TouchableOpacity
-                                        key={item.id}
-                                        onPress={() => {
-                                            setSelectedItem(item);
-                                            if (isUnread) markAsRead(item);
-                                        }}
-                                        style={[s.notifCard, isUnread && s.notifCardUnread]}
-                                        activeOpacity={0.8}
-                                    >
-                                        <View style={[s.notifIconCircle, { backgroundColor: iconMeta.bg }]}>
-                                            <Ionicons name={iconMeta.name as any} size={18} color={iconMeta.color} />
-                                        </View>
-
-                                        <View style={{ flex: 1, marginHorizontal: 10 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, paddingRight: 6 }}>
-                                                    <Text style={[s.notifTitle, isUnread && { fontWeight: '900', color: C.textMain }]} numberOfLines={1}>
-                                                        {item.title}
-                                                    </Text>
-                                                    {isUnread && <View style={s.unreadDot} />}
-                                                </View>
-                                                <Text style={s.notifTime}>
-                                                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </Text>
-                                            </View>
-
-                                            <Text style={s.notifBody} numberOfLines={2}>
-                                                {item.body}
-                                            </Text>
-
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                                                <View style={[s.tagBadge, { backgroundColor: iconMeta.bg }]}>
-                                                    <Text style={[s.tagBadgeText, { color: iconMeta.color }]}>
-                                                        {iconMeta.label}
-                                                    </Text>
-                                                </View>
-                                                {item.profiles?.full_name && (
-                                                    <Text style={s.userBadgeText}>
-                                                        From: {item.profiles.full_name}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </View>
-
-                                        <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                                    </TouchableOpacity>
-                                );
-                            })
-                        )}
-                    </ScrollView>
-                </View>
-            ) : activeTab === 'broadcasts' ? (
-                /* TAB 2: PERMANENT BROADCAST ARCHIVE (Ba ya goguwa) */
+            {activeTab === 'broadcasts' ? (
+                /* TAB: PERMANENT BROADCAST ARCHIVE (Ba ya goguwa) */
                 <View style={{ flex: 1 }}>
                     {/* Header banner explaining permanent retention */}
                     <View style={s.permanentNoticeBanner}>
@@ -1288,9 +1167,91 @@ export default function AdminPushNotificationsScreen() {
                         </View>
                     )}
 
-                    {/* 3. Notification Message Content with Cortex AI Generator */}
+                    {/* 3. Delivery Channels & Email Gateway Verification */}
+                    <Text style={s.sectionHeader}>3. DELIVERY CHANNELS & EMAIL GATEWAY</Text>
+                    <View style={s.deliveryChannelsCard}>
+                        {/* Channel 1: Mobile Push */}
+                        <View style={s.channelRow}>
+                            <View style={[s.channelIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                                <Ionicons name="phone-portrait-outline" size={20} color={C.blue} />
+                            </View>
+                            <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={s.channelTitle}>Mobile App Push Banner</Text>
+                                    <View style={s.liveVerifiedTag}>
+                                        <Text style={s.liveVerifiedTagTxt}>Realtime</Text>
+                                    </View>
+                                </View>
+                                <Text style={s.channelDesc}>
+                                    Delivers to user lockscreens and notification centers with chosen sound chimes.
+                                </Text>
+                            </View>
+                            <Switch
+                                value={sendPushNotification}
+                                onValueChange={setSendPushNotification}
+                                trackColor={{ false: '#CBD5E1', true: C.navy }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+
+                        <View style={s.channelDivider} />
+
+                        {/* Channel 2: Email Inbox Notification */}
+                        <View style={s.channelRow}>
+                            <View style={[s.channelIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                                <Ionicons name="mail-outline" size={20} color={C.gold} />
+                            </View>
+                            <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={s.channelTitle}>Notification Email (Inbox Delivery)</Text>
+                                    <View style={[s.liveVerifiedTag, { backgroundColor: '#DCFCE7' }]}>
+                                        <Text style={[s.liveVerifiedTagTxt, { color: '#16A34A' }]}>100% Direct</Text>
+                                    </View>
+                                </View>
+                                <Text style={s.channelDesc}>
+                                    Delivers branded HTML announcements directly into recipients' email inboxes via Resend/SMTP.
+                                </Text>
+                            </View>
+                            <Switch
+                                value={sendEmailNotification}
+                                onValueChange={setSendEmailNotification}
+                                trackColor={{ false: '#CBD5E1', true: C.gold }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+
+                        {/* One-Tap Test Email Gateway Bar */}
+                        <View style={s.testEmailBar}>
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <Ionicons name="shield-checkmark" size={14} color="#059669" />
+                                    <Text style={s.testEmailTitle}>Email Gateway Verification</Text>
+                                </View>
+                                <Text style={s.testEmailSub}>
+                                    Send a live test email now to verify direct inbox delivery to {singleTargetQuery && singleTargetQuery.includes('@') ? singleTargetQuery : 'admin email'}.
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={handleTestEmailGateway}
+                                disabled={testingEmail}
+                                style={s.testEmailBtn}
+                                activeOpacity={0.8}
+                            >
+                                {testingEmail ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="paper-plane-outline" size={13} color="#FFFFFF" />
+                                        <Text style={s.testEmailBtnTxt}>Test Mail</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* 4. Notification Message Content with Cortex AI Generator */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 8 }}>
-                        <Text style={[s.sectionHeader, { marginTop: 0, marginBottom: 0 }]}>3. NOTIFICATION MESSAGE</Text>
+                        <Text style={[s.sectionHeader, { marginTop: 0, marginBottom: 0 }]}>4. NOTIFICATION MESSAGE</Text>
                         <TouchableOpacity
                             onPress={() => handleAIGenerateBroadcast()}
                             disabled={generatingAI}
@@ -1410,29 +1371,11 @@ export default function AdminPushNotificationsScreen() {
                                 </Text>
                             </View>
                         )}
-
-                        {/* Quick Dispatch CTA directly inside Message Card */}
-                        <TouchableOpacity
-                            onPress={handleDispatchNotification}
-                            disabled={sending}
-                            style={[s.dispatchSubmitBtn, { marginTop: 14 }]}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            {sending ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                                <>
-                                    <Ionicons name="paper-plane" size={17} color="#FFFFFF" />
-                                    <Text style={s.dispatchSubmitBtnText}>Dispatch Push Notification Now</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
                     </View>
 
-                    {/* 4. Notification Ringtone / Chime Selection */}
+                    {/* 5. Notification Ringtone / Chime Selection */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 8 }}>
-                        <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>4. ALERT RINGTONE</Text>
+                        <Text style={[s.sectionHeader, { marginBottom: 0, marginTop: 0 }]}>5. ALERT RINGTONE</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <TouchableOpacity
                                 onPress={() => handleSaveAdminRingtone(selectedRingtoneForPush)}
@@ -1515,7 +1458,13 @@ export default function AdminPushNotificationsScreen() {
                         ) : (
                             <>
                                 <Ionicons name="paper-plane" size={17} color="#FFFFFF" />
-                                <Text style={s.dispatchSubmitBtnText}>Dispatch Push Notification Now</Text>
+                                <Text style={s.dispatchSubmitBtnText}>
+                                    {sendEmailNotification && sendPushNotification
+                                        ? 'Dispatch Push & Email Notification Now'
+                                        : sendEmailNotification
+                                        ? 'Dispatch Email Notification Now'
+                                        : 'Dispatch Push Notification Now'}
+                                </Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -2040,6 +1989,90 @@ const s = StyleSheet.create({
         fontSize: 12,
         fontWeight: '900',
         color: '#7C3AED',
+    },
+    deliveryChannelsCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 16,
+    },
+    channelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+    },
+    channelIconCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    channelTitle: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    channelDesc: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+        lineHeight: 15,
+    },
+    channelDivider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginVertical: 10,
+    },
+    liveVerifiedTag: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        backgroundColor: '#EFF6FF',
+    },
+    liveVerifiedTagTxt: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#2563EB',
+    },
+    testEmailBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        backgroundColor: '#F8FAFC',
+        padding: 10,
+        borderRadius: 10,
+    },
+    testEmailTitle: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        color: '#065F46',
+    },
+    testEmailSub: {
+        fontSize: 10.5,
+        color: '#64748B',
+        marginTop: 2,
+        lineHeight: 14,
+    },
+    testEmailBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#0F172A',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    testEmailBtnTxt: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
     },
     formGroup: {
         marginBottom: 10,

@@ -749,14 +749,15 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Remote Expo Push Notifications (when channel is push or all)
+            // Remote Expo Push Notifications (when channel is push or broadcast or sendPushNotification enabled)
             const validTokens = Array.from(new Set(
                 targetUsers
                     .map(u => u.expo_push_token)
                     .filter((t): t is string => Boolean(t && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken['))))
             ));
 
-            if (validTokens.length > 0 && (dispatchType === 'push' || dispatchType === 'broadcast')) {
+            const shouldSendPush = body.sendPushNotification !== false && (dispatchType === 'push' || dispatchType === 'broadcast' || body.sendPushNotification === true);
+            if (validTokens.length > 0 && shouldSendPush) {
                 const expoMessages = validTokens.map(token => ({
                     to: token,
                     sound: 'default',
@@ -787,9 +788,10 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // Real Email Channel Dispatch (when channel is email)
+            // Real Email Channel Dispatch (when channel is email or sendEmailNotification enabled)
             let emailsDeliveredCount = 0;
-            if (dispatchType === 'email') {
+            const shouldSendEmail = dispatchType === 'email' || body.sendEmailNotification === true || body.channel === 'email' || (Array.isArray(body.channels) && body.channels.includes('email'));
+            if (shouldSendEmail) {
                 const validEmails = Array.from(new Set(
                     targetUsers
                         .map(u => u.email)

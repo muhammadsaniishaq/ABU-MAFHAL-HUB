@@ -111,8 +111,15 @@ export const sendEmail = async (
                 return { success: true, method: 'Resend', id: resData.id, resData };
             } else {
                 console.warn("[sendEmail] Resend primary sender notice:", resData);
-                // Fallback attempt with notifications@abumafhal.com.ng
-                if (resData?.message && resData.message.includes('from')) {
+                // Fallback attempt: if domain unverified or sender rejected, try onboarding@resend.dev
+                const needsDomainFallback = resData?.message && (
+                    resData.message.includes('domain') || 
+                    resData.message.includes('from') || 
+                    resData.message.includes('not verified')
+                );
+
+                if (needsDomainFallback) {
+                    console.log("[sendEmail] Attempting Resend fallback via onboarding@resend.dev...");
                     const fallbackRes = await fetch('https://api.resend.com/emails', {
                         method: 'POST',
                         headers: {
@@ -120,7 +127,7 @@ export const sendEmail = async (
                             'Authorization': `Bearer ${resendApiKey.trim()}`
                         },
                         body: JSON.stringify({
-                            from: 'Abu Mafhal Sub <notifications@abumafhal.com.ng>',
+                            from: 'Abu Mafhal Sub <onboarding@resend.dev>',
                             to: [to],
                             subject,
                             text,
@@ -129,12 +136,13 @@ export const sendEmail = async (
                     });
                     const fbData = await fallbackRes.json();
                     if (fallbackRes.ok && fbData?.id) {
-                        return { success: true, method: 'Resend-Notifications', id: fbData.id, fbData };
+                        return { success: true, method: 'Resend-Verified', id: fbData.id, fbData };
                     }
+                    console.warn("[sendEmail] Resend fallback also failed, continuing to SMTP...", fbData);
                 }
             }
         } catch (err: any) {
-            console.error("[sendEmail] Resend API exception:", err);
+            console.error("[sendEmail] Resend API exception (falling through to SMTP):", err);
         }
     }
 
