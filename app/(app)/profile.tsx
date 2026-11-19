@@ -295,9 +295,9 @@ export default function UserProfileScreen() {
     const performLogout = async () => {
         await forceSignOut();
         if (Platform.OS === 'web') {
-            window.location.href = '/';
+            window.location.href = '/landing.html';
         } else {
-            router.replace('/');
+            router.replace('/splash' as any);
         }
     };
 

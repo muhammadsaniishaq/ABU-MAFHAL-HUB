@@ -393,9 +393,9 @@ export default function PinUnlockScreen() {
                 await AsyncStorage.removeItem('app_unlocked');
                 await AsyncStorage.removeItem('has_active_session');
                 await AsyncStorage.removeItem(PIN_KEY);
-                router.replace('/');
+                router.replace('/splash' as any);
             } catch (e) {
-                router.replace('/');
+                router.replace('/splash' as any);
             }
         };
 

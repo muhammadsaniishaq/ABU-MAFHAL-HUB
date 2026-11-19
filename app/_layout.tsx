@@ -197,7 +197,7 @@ export default function RootLayout() {
                 if (session?.user) {
                     setSession(session);
                     await AsyncStorage.setItem('has_active_session', 'true');
-                    await AsyncStorage.setItem('app_unlocked', 'true');
+                    // Do not set app_unlocked on INITIAL_SESSION so PIN unlock is required on app cold start
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
                     fetchUserRole(session.user.id, session.user.email);
@@ -215,9 +215,9 @@ export default function RootLayout() {
                 setAuthChecked(true);
                 if (Platform.OS === 'web') {
                     if (typeof window !== 'undefined') window.location.replace('/landing.html');
-                    else router.replace('/');
+                    else router.replace('/splash' as any);
                 } else {
-                    router.replace('/');
+                    router.replace('/splash' as any);
                 }
                 return;
             }
@@ -379,7 +379,7 @@ export default function RootLayout() {
         const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp', 'reset-password', 'complete-profile'];
         const isAuthGroup = segments.includes('(auth)') || authScreens.includes(currentScreen);
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
-        const publicScreens = ['index', 'onboarding', 'privacy', 'terms', 'signup', 'login'];
+        const publicScreens = ['index', 'splash', 'onboarding', 'privacy', 'terms', 'signup', 'login'];
         const isPublicScreen = publicScreens.includes(currentScreen);
 
         if (session?.user) {
@@ -456,8 +456,12 @@ export default function RootLayout() {
                     router.replace('/dashboard' as any);
                 } else if (isManagementGroup && !isAdmin) {
                     router.replace('/dashboard' as any);
-                } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                    router.replace('/dashboard' as any);
+                } else if (currentScreen === 'splash' || currentScreen === 'onboarding') {
+                    if (unlocked !== 'true') {
+                        router.replace('/(auth)/pin' as any);
+                    } else {
+                        router.replace('/dashboard' as any);
+                    }
                 }
             })().catch(() => {});
         } else {
@@ -526,6 +530,7 @@ export default function RootLayout() {
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="splash" options={{ headerShown: false }} />
                     <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                     <Stack.Screen name="privacy" options={{ headerShown: false }} />
                     <Stack.Screen name="terms" options={{ headerShown: false }} />

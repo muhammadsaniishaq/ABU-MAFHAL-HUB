@@ -1187,7 +1187,7 @@ export default function AppDesigner() {
 
                 <TouchableOpacity
                   style={[s.splashHeaderActionBtn, { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: T.gold }]}
-                  onPress={() => router.push('/?preview=splash' as any)}
+                  onPress={() => router.push('/splash?preview=splash' as any)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="play-circle" size={15} color={T.gold} />
@@ -1633,7 +1633,7 @@ export default function AppDesigner() {
                 style={s.phoneFullTestBtn}
                 onPress={() => {
                   setShowLivePreviewModal(false);
-                  router.push('/?preview=splash' as any);
+                  router.push('/splash?preview=splash' as any);
                 }}
               >
                 <Ionicons name="open-outline" size={14} color="#FFFFFF" />
